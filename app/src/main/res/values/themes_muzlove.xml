@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.MuzLove.App" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:statusBarColor">#0A0913</item>
+        <item name="android:navigationBarColor">#0A0913</item>
+        <item name="android:windowBackground">#0A0913</item>
+        <item name="colorAccent">#8B5CF6</item>
+    </style>
+
+    <style name="Theme.MuzLove.Splash" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#0A0913</item>
+        <item name="android:statusBarColor">#0A0913</item>
+        <item name="android:navigationBarColor">#0A0913</item>
+    </style>
+</resources>

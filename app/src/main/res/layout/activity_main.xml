@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0A0913">
+
+    <!-- ОСНОВНОЙ КОНТЕНТ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:id="@+id/headerBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="28dp"
+            android:paddingBottom="12dp">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <TextView
+                    android:id="@+id/eyebrow"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="#A09CB8"
+                    android:textSize="14sp"
+                    android:text="Добрый вечер" />
+
+                <ImageView
+                    android:id="@+id/btnSettings"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:layout_gravity="end"
+                    android:padding="2dp"
+                    android:src="@drawable/ic_settings"
+                    android:alpha="0.8" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/h1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#F3F1FA"
+                android:textSize="32sp"
+                android:textStyle="bold"
+                android:layout_marginTop="4dp"
+                android:text="Что послушаем?" />
+
+            <LinearLayout
+                android:id="@+id/searchBox"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/search_bg"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:layout_marginTop="20dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_search"
+                    app:tint="#8884A0"
+                    xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+                <EditText
+                    android:id="@+id/searchInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@null"
+                    android:hint="Треки, исполнители, альбомы"
+                    android:textColorHint="#8884A0"
+                    android:textColor="#F3F1FA"
+                    android:textSize="15sp"
+                    android:paddingStart="10dp"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/playlistsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="20dp"
+            android:clipToPadding="false">
+
+            <LinearLayout
+                android:id="@+id/playlistsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="100dp"
+            android:clipToPadding="false"
+            android:scrollbars="none" />
+
+        <LinearLayout
+            android:id="@+id/profileContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:padding="20dp">
+            <!-- Здесь будет контент профиля -->
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/settingsContainer"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="8dp"
+                android:paddingBottom="8dp">
+
+                <ImageView
+                    android:id="@+id/btnSettingsBack"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_back"
+                    android:background="?attr/selectableItemBackgroundBorderless" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Настройки"
+                    android:textColor="#F3F1FA"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:layout_marginStart="8dp"
+                    android:id="@+id/settingsTitleLabel" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+                <LinearLayout
+                    android:id="@+id/settingsList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp" />
+            </ScrollView>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- МИНИ-ПЛЕЕР -->
+    <FrameLayout
+        android:id="@+id/miniPlayer"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_gravity="bottom"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="74dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="10dp">
+
+            <View
+                android:id="@+id/miniCover"
+                android:layout_width="44dp"
+                android:layout_height="44dp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="8dp">
+
+                <TextView
+                    android:id="@+id/miniTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#F3F1FA"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/miniArtist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#A09CB8"
+                    android:textSize="12sp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/miniLike"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:padding="6dp"
+                android:src="@drawable/ic_heart" />
+
+            <FrameLayout
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="4dp">
+
+                <View
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:background="@drawable/circle_accent" />
+
+                <ImageView
+                    android:id="@+id/miniPlayIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_play" />
+            </FrameLayout>
+        </LinearLayout>
+
+        <View
+            android:id="@+id/miniProgress"
+            android:layout_width="0dp"
+            android:layout_height="2dp"
+            android:layout_gravity="bottom" />
+    </FrameLayout>
+
+    <!-- НИЖНЯЯ НАВИГАЦИЯ -->
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="66dp"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:background="#F00A0913"
+        android:paddingBottom="4dp">
+
+        <LinearLayout android:id="@+id/navHome"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/navHomeIc" android:layout_width="23dp" android:layout_height="23dp" android:src="@drawable/ic_home" />
+            <TextView android:id="@+id/navHomeTx" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Главная" android:textSize="11sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navSearch"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/navSearchIc" android:layout_width="23dp" android:layout_height="23dp" android:src="@drawable/ic_search" />
+            <TextView android:id="@+id/navSearchTx" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Поиск" android:textSize="11sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navLibrary"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/navLibIc" android:layout_width="23dp" android:layout_height="23dp" android:src="@drawable/ic_library" />
+            <TextView android:id="@+id/navLibTx" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Моё" android:textSize="11sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/navProfile"
+            android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+            android:orientation="vertical" android:gravity="center" android:clickable="true" android:focusable="true">
+            <ImageView android:id="@+id/navProfileIc" android:layout_width="23dp" android:layout_height="23dp" android:src="@drawable/ic_profile" />
+            <TextView android:id="@+id/navProfileTx" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Профиль" android:textSize="11sp" android:textStyle="bold" android:layout_marginTop="4dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ПОЛНОЭКРАННЫЙ ПЛЕЕР -->
+    <include layout="@layout/view_now_playing" />
+
+</FrameLayout>

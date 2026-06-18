@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0A0913">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <ImageView
+            android:id="@+id/splashLogo"
+            android:layout_width="132dp"
+            android:layout_height="132dp"
+            android:src="@drawable/muzlove_logo"
+            android:contentDescription="MUZLOVE" />
+
+        <TextView
+            android:id="@+id/splashTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="MUZLOVE"
+            android:textColor="#FFFFFF"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif"
+            android:letterSpacing="0.32"
+            android:layout_marginTop="22dp" />
+
+        <TextView
+            android:id="@+id/splashTagline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="GOOD MUSIC · GOOD MOOD"
+            android:textColor="#8E8AA8"
+            android:textSize="11sp"
+            android:letterSpacing="0.18"
+            android:layout_marginTop="12dp" />
+    </LinearLayout>
+</FrameLayout>
