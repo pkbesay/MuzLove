@@ -48,14 +48,15 @@ public class MainActivity extends AppCompatActivity {
     // состояние (воспроизведение — в PlayerEngine, данные пользователя — в AppState)
     private PlayerEngine engine;
     private AppState appState;
-    private boolean userSeeking = false;                     // пользователь тянет ползунок
+    private PlayerSheets sheets;                             // шторки и диалоги плеера
+    private boolean userSeeking = false;                     // пользователь тянет ползунок или волну
     private float miniRatio = 0f;                            // прогресс для полоски мини-плеера
     private int screen = 0;                                  // 0 home, 1 search, 2 library, 3 profile, 4 settings
     private final List<Integer> screenHistory = new ArrayList<>();
     private boolean npOpen = false;
 
     // тема и настройки
-    private boolean light = false, waveform = true;
+    private boolean light = false, waveform = false;
     private int cBase, cText, cMuted, cSurface;
 
     // хранилище
@@ -79,9 +80,10 @@ public class MainActivity extends AppCompatActivity {
     private View miniCover, miniProgress;
     private TextView miniTitle, miniArtist;
     private ImageView miniLike, miniPlayIcon;
-    private View npOverlay, npCover, playBtn;
+    private View miniPlayBtn;
+    private View npOverlay, npCover, playBtn, playBuffering;
     private SeekBar slider;
-    private ImageView btnShare, btnMore, btnQueue;
+    private ImageView btnShare, btnMore, btnQueue, btnEq;
     private TextView npAlbum, npTitle, npArtist, timeCur, timeDur;
     private ImageView npLike, btnShuffle, btnRepeat, playIcon, navHomeIc, navSearchIc, navLibIc, navProfileIc;
     private TextView navHomeTx, navSearchTx, navLibTx, navProfileTx;
@@ -132,6 +134,7 @@ public class MainActivity extends AppCompatActivity {
 
         appState = AppState.get(this);
         engine = PlayerEngine.get(this);
+        sheets = new PlayerSheets(this);   // до onStart: регистрирует ActivityResultLauncher
         light = storage.isLight();
         waveform = storage.isWaveform();
         computeTheme();
@@ -142,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
         setupNowPlaying();
         setupBack();
 
-        wave.setSimpleMode(!waveform);
+        applyWaveformSetting();
 
         // Обработка системных отступов (чтобы не перекрывалось виджетами телефона)
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
@@ -213,6 +216,7 @@ public class MainActivity extends AppCompatActivity {
         miniArtist = findViewById(R.id.miniArtist);
         miniLike = findViewById(R.id.miniLike);
         miniPlayIcon = findViewById(R.id.miniPlayIcon);
+        miniPlayBtn = findViewById(R.id.miniPlayBtn);
 
         bottomNav = findViewById(R.id.bottomNav);
         navHomeIc = findViewById(R.id.navHomeIc);
@@ -244,11 +248,13 @@ public class MainActivity extends AppCompatActivity {
         wave = findViewById(R.id.wave);
         playBtn = findViewById(R.id.btnPlay);
         playIcon = findViewById(R.id.playIcon);
+        playBuffering = findViewById(R.id.playBuffering);
         btnShuffle = findViewById(R.id.btnShuffle);
         btnRepeat = findViewById(R.id.btnRepeat);
         btnShare = findViewById(R.id.btnShare);
         btnMore = findViewById(R.id.btnMore);
         btnQueue = findViewById(R.id.btnQueue);
+        btnEq = findViewById(R.id.btnEq);
         slider = findViewById(R.id.slider);
         slider.setMax(1000);
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -382,7 +388,7 @@ public class MainActivity extends AppCompatActivity {
 
         miniPlayer.setOnClickListener(v -> { if (engine.isStarted()) openNowPlaying(true); });
         miniLike.setOnClickListener(v -> toggleLike());
-        miniPlayIcon.setOnClickListener(v -> engine.toggle());
+        miniPlayBtn.setOnClickListener(v -> engine.toggle());
     }
 
     /** Системная кнопка «Назад» (onBackPressed() на Android 16 с targetSdk 36 не вызывается). */
@@ -420,11 +426,33 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btnPrev).setOnClickListener(v -> engine.prev());
         btnShuffle.setOnClickListener(v -> engine.toggleShuffle());
         btnRepeat.setOnClickListener(v -> engine.cycleRepeat());
-        btnShare.setOnClickListener(v -> showShareSheet());
-        btnMore.setOnClickListener(v -> showMoreSheet());
-        btnQueue.setOnClickListener(v -> { openNowPlaying(false); showScreen(2); });
+        // шторки с экрана плеера всегда тёмные, как и сам плеер
+        btnShare.setOnClickListener(v -> sheets.showShare(engine.current(), true));
+        btnMore.setOnClickListener(v -> sheets.showMore(engine.current(), true));
+        btnQueue.setOnClickListener(v -> sheets.showQueue(true));
+        btnEq.setOnClickListener(v -> sheets.showEqualizer(true));
         npLike.setOnClickListener(v -> toggleLike());
-        wave.setOnSeek(ratio -> engine.seekTo((int) (ratio * engine.durationMs())));
+        // волна: как ползунок — пока тянут, двигается только подпись, перемотка при отпускании
+        wave.setOnSeekListener(new WaveformView.OnSeekListener() {
+            @Override public void onStartSeek() { userSeeking = true; }
+            @Override public void onSeekMove(float ratio) {
+                if (engine.isStarted()) timeCur.setText(fmt((int) (ratio * engine.durationMs()) / 1000));
+            }
+            @Override public void onStopSeek(float ratio) {
+                userSeeking = false;
+                if (engine.isStarted()) engine.seekTo((int) (ratio * engine.durationMs()));
+            }
+            @Override public void onCancelSeek() {
+                userSeeking = false;
+                updateProgress(engine.positionMs(), engine.durationMs());
+            }
+        });
+    }
+
+    /** «Звуковая волна»: вкл — волна вместо ползунка, выкл — ползунок. */
+    private void applyWaveformSetting() {
+        wave.setVisibility(waveform ? View.VISIBLE : View.GONE);
+        slider.setVisibility(waveform ? View.GONE : View.VISIBLE);
     }
 
     private void rebuildPlaylistsRow() {
@@ -641,7 +669,7 @@ public class MainActivity extends AppCompatActivity {
             light = !light; storage.setLight(light); applyTheme(); setupSettingsContent();
         }));
         settingsList.addView(settingRow("Звуковая волна", waveform ? "Вкл" : "Выкл", () -> {
-            waveform = !waveform; storage.setWaveform(waveform); wave.setSimpleMode(!waveform); setupSettingsContent();
+            waveform = !waveform; storage.setWaveform(waveform); applyWaveformSetting(); setupSettingsContent();
         }));
         settingsList.addView(settingRow("Изменить имя", storage.getName(), this::editNameDialog));
         settingsList.addView(settingRow("О приложении", "Resonance 1.7", () ->
@@ -864,11 +892,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updatePlayIcons() {
-        int icon = engine.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play;
+        boolean playing = engine.isPlaying();
+        int icon = playing ? R.drawable.ic_pause : R.drawable.ic_play;
         playIcon.setImageResource(icon);
         miniPlayIcon.setImageResource(icon);
         playIcon.setColorFilter(Color.parseColor("#0A0913"));
         miniPlayIcon.setColorFilter(Color.parseColor("#0A0913"));
+        // пока трек готовится — крутилка в большой кнопке вместо значка (мини-плеер как был)
+        boolean buffering = engine.isBuffering();
+        playBuffering.setVisibility(buffering ? View.VISIBLE : View.GONE);
+        playIcon.setVisibility(buffering ? View.INVISIBLE : View.VISIBLE);
+        String cd = playing ? "Пауза" : "Воспроизвести";
+        playBtn.setContentDescription(cd);
+        miniPlayBtn.setContentDescription(cd);
     }
 
     /** Плеер всегда тёмный: активные кнопки жёлтые, неактивные — полупрозрачные белые. */
@@ -886,6 +922,9 @@ public class MainActivity extends AppCompatActivity {
         boolean isLiked = appState.isLiked(t.id);
         npLike.setColorFilter(isLiked ? 0xFFF4FE52 : Color.WHITE);
         miniLike.setColorFilter(isLiked ? t.c1 : (light ? 0xFF15131F : 0xFFC9C5DE));
+        String cd = isLiked ? "Убрать из любимых" : "Добавить в любимые";
+        npLike.setContentDescription(cd);
+        miniLike.setContentDescription(cd);
     }
 
     private void updateNowPlayingUI(Track t) {
@@ -921,84 +960,6 @@ public class MainActivity extends AppCompatActivity {
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{blend(t.c1, a1), blend(t.c2, a2), cBase});
         root.setBackground(bg);
-    }
-
-    private void showShareSheet() {
-        com.google.android.material.bottomsheet.BottomSheetDialog d = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding((int)dp(20), (int)dp(20), (int)dp(20), (int)dp(30));
-        root.setBackgroundColor(Color.parseColor("#161422"));
-
-        TextView t = new TextView(this);
-        t.setText("Поделиться треком"); t.setTextColor(Color.WHITE);
-        t.setTextSize(20); t.setGravity(Gravity.CENTER);
-        t.setPadding(0, 0, 0, (int)dp(20));
-        root.addView(t);
-
-        String[] opts = {"Facebook", "Ссылка", "Еще"};
-        int[] ics = {R.drawable.ic_profile, R.drawable.ic_search, R.drawable.ic_more};
-        LinearLayout row = new LinearLayout(this);
-        row.setGravity(Gravity.CENTER);
-        for(int i=0; i<opts.length; i++) {
-            LinearLayout col = new LinearLayout(this);
-            col.setOrientation(LinearLayout.VERTICAL);
-            col.setGravity(Gravity.CENTER);
-            col.setPadding((int)dp(15), 0, (int)dp(15), 0);
-            ImageView iv = new ImageView(this);
-            iv.setImageResource(ics[i]); iv.setColorFilter(Color.WHITE);
-            iv.setBackgroundResource(R.drawable.circle_overlay);
-            iv.getBackground().setTint(Color.parseColor("#33FFFFFF"));
-            iv.setPadding((int)dp(12), (int)dp(12), (int)dp(12), (int)dp(12));
-            col.addView(iv, new LinearLayout.LayoutParams((int)dp(50), (int)dp(50)));
-            TextView tv = new TextView(this); tv.setText(opts[i]); tv.setTextColor(Color.WHITE);
-            tv.setTextSize(12); tv.setPadding(0, (int)dp(8), 0, 0);
-            col.addView(tv);
-            row.addView(col);
-        }
-        root.addView(row);
-        d.setContentView(root); d.show();
-    }
-
-    private void showMoreSheet() {
-        Track t = engine.current();
-        if (t == null) return;
-        com.google.android.material.bottomsheet.BottomSheetDialog d = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.parseColor("#161422"));
-        root.setPadding(0, (int)dp(10), 0, (int)dp(20));
-
-        LinearLayout header = new LinearLayout(this);
-        header.setPadding((int)dp(20), (int)dp(10), (int)dp(20), (int)dp(20));
-        ImageView iv = new ImageView(this);
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{t.c1, t.c2});
-        g.setCornerRadius(dp(8)); iv.setBackground(g);
-        header.addView(iv, new LinearLayout.LayoutParams((int)dp(50), (int)dp(50)));
-        LinearLayout info = new LinearLayout(this);
-        info.setOrientation(LinearLayout.VERTICAL); info.setPadding((int)dp(15), 0, 0, 0);
-        TextView title = new TextView(this); title.setText(t.title); title.setTextColor(Color.WHITE); title.setTextSize(16);
-        TextView art = new TextView(this); art.setText(t.artist); art.setTextColor(Color.LTGRAY); art.setTextSize(14);
-        info.addView(title); info.addView(art);
-        header.addView(info);
-        root.addView(header);
-
-        String[] items = {"Поделиться", "Добавить в плейлист", "Слушать на устройстве", "Удалить из очереди", "О треке"};
-        int[] ics = {R.drawable.ic_upload, R.drawable.ic_plus, R.drawable.ic_notes, R.drawable.ic_trash, R.drawable.ic_notes};
-        for(int i=0; i<items.length; i++) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding((int)dp(20), (int)dp(12), (int)dp(20), (int)dp(12));
-            ImageView icon = new ImageView(this); icon.setImageResource(ics[i]); icon.setColorFilter(Color.WHITE);
-            row.addView(icon, new LinearLayout.LayoutParams((int)dp(24), (int)dp(24)));
-            TextView txt = new TextView(this); txt.setText(items[i]); txt.setTextColor(Color.WHITE);
-            txt.setTextSize(15); txt.setPadding((int)dp(15), 0, 0, 0);
-            row.addView(txt);
-            final int idx = i;
-            row.setOnClickListener(v -> { d.dismiss(); if(idx==0) showShareSheet(); });
-            root.addView(row);
-        }
-        d.setContentView(root); d.show();
     }
 
     private void openMini() {
@@ -1067,6 +1028,24 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         if (engine != null) engine.removeListener(engineListener);
         super.onStop();                       // воспроизведение продолжается
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (sheets != null) sheets.dismissAll();   // окна шторок и их слушатели движка не переживают активность
+        super.onDestroy();
+    }
+
+    // ---------- для PlayerSheets (и шторок следующих экранов) ----------
+    PlayerEngine engine() { return engine; }
+    AppState appState() { return appState; }
+    /** true — светлая тема приложения (шторки вне плеера следуют ей: dark = !isLightTheme()). */
+    boolean isLightTheme() { return light; }
+
+    /** Свои плейлисты изменились: ряд плейлистов на Главной и счётчики профиля. */
+    void onPlaylistsChanged() {
+        rebuildPlaylistsRow();
+        if (screen == 3) setupProfileContent();
     }
 
     // ---------- тема ----------
@@ -1166,14 +1145,9 @@ public class MainActivity extends AppCompatActivity {
         return "Добрый вечер";
     }
 
-    private String tracksWord(int n) {
-        int a = n % 10, b = n % 100;
-        if (a == 1 && b != 11) return "трек";
-        if (a >= 2 && a <= 4 && (b < 10 || b >= 20)) return "трека";
-        return "треков";
-    }
+    static String tracksWord(int n) { return Texts.plural(n, "трек", "трека", "треков"); }
 
-    private void toast(String s) {
+    void toast(String s) {
         android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();
     }
 

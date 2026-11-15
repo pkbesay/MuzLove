@@ -25,6 +25,9 @@ public class StorageManager {
     private static final String KEY_SHUFFLE = "player_shuffle";
     private static final String KEY_REPEAT = "player_repeat";
     private static final String KEY_NOTIF_ASKED = "notifications_asked";
+    private static final String KEY_EQ_ENABLED = "eq_enabled";
+    private static final String KEY_EQ_BANDS = "eq_bands";
+    private static final String KEY_EQ_PRESET = "eq_preset";
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -83,8 +86,8 @@ public class StorageManager {
         prefs.edit().putBoolean(KEY_LIGHT, v).putBoolean(KEY_THEME_INITIALIZED, true).apply();
     }
 
-    // ---- звуковая волна / ползунок ----
-    public boolean isWaveform() { return prefs.getBoolean(KEY_WAVE, true); }
+    // ---- звуковая волна / ползунок (по умолчанию — ползунок) ----
+    public boolean isWaveform() { return prefs.getBoolean(KEY_WAVE, false); }
     public void setWaveform(boolean v) { prefs.edit().putBoolean(KEY_WAVE, v).apply(); }
 
     // ---- режимы плеера: перемешивание и повтор (0 выкл, 1 все, 2 один) ----
@@ -96,6 +99,24 @@ public class StorageManager {
     // ---- разрешение на уведомления уже запрашивали (API 33+, спрашиваем один раз) ----
     public boolean wasNotificationsAsked() { return prefs.getBoolean(KEY_NOTIF_ASKED, false); }
     public void setNotificationsAsked() { prefs.edit().putBoolean(KEY_NOTIF_ASKED, true).apply(); }
+
+    // ---- эквалайзер: включён, уровни полос (миллибелы), пресет (-1 — свой) ----
+    public boolean isEqEnabled() { return prefs.getBoolean(KEY_EQ_ENABLED, false); }
+    public void setEqEnabled(boolean v) { prefs.edit().putBoolean(KEY_EQ_ENABLED, v).apply(); }
+    public int getEqPreset() { return prefs.getInt(KEY_EQ_PRESET, -1); }
+    public void setEqPreset(int p) { prefs.edit().putInt(KEY_EQ_PRESET, p).apply(); }
+
+    public int[] getEqBands() {
+        String json = prefs.getString(KEY_EQ_BANDS, null);
+        if (json == null) return new int[0];
+        int[] out = null;
+        try { out = gson.fromJson(json, int[].class); } catch (RuntimeException ignored) {}
+        return out != null ? out : new int[0];
+    }
+
+    public void setEqBands(int[] levels) {
+        prefs.edit().putString(KEY_EQ_BANDS, gson.toJson(levels != null ? levels : new int[0])).apply();
+    }
 
     // ---- лайки ----
     public void saveLikes(Set<Integer> likes) {

@@ -62,6 +62,7 @@ public final class PlayerEngine {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AudioManager audio;
     private final List<Listener> listeners = new ArrayList<>();
+    private final EqualizerController equalizer;
     private final AudioAttributes attrs = new AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build();
@@ -95,6 +96,7 @@ public final class PlayerEngine {
         this.data = AppState.get(app);
         this.storage = data.storage();
         this.audio = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+        this.equalizer = new EqualizerController(storage);
         queue.setShuffle(storage.getShuffle());
         queue.setRepeat(storage.getRepeat());
     }
@@ -150,6 +152,8 @@ public final class PlayerEngine {
         if (mp == null) return 0;
         try { return mp.getAudioSessionId(); } catch (IllegalStateException e) { return 0; }
     }
+    /** Эквалайзер текущей аудиосессии (работает и когда ничего не играет: isAvailable() == false). */
+    public EqualizerController equalizer() { return equalizer; }
 
     // ---------- команды ----------
     /** Очередь = список, из которого нажали трек. Повторное нажатие на текущий трек — пауза / продолжить. */
@@ -392,10 +396,12 @@ public final class PlayerEngine {
         if (mp != null) return;
         mp = new MediaPlayer();
         mp.setWakeMode(app, PowerManager.PARTIAL_WAKE_LOCK);
+        equalizer.onSession(audioSessionId());   // новый плеер — новая сессия: эквалайзер заново
     }
 
     private void releasePlayer() {
         if (mp == null) return;
+        equalizer.release();
         try { mp.reset(); } catch (RuntimeException ignored) {}
         mp.release();
         mp = null;

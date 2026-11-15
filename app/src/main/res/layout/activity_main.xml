@@ -239,12 +239,17 @@
                 android:layout_width="34dp"
                 android:layout_height="34dp"
                 android:padding="6dp"
-                android:src="@drawable/ic_heart" />
+                android:src="@drawable/ic_heart"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Добавить в любимые" />
 
             <FrameLayout
+                android:id="@+id/miniPlayBtn"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:layout_marginStart="4dp">
+                android:layout_marginStart="4dp"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Воспроизвести">
 
                 <View
                     android:layout_width="38dp"
@@ -256,6 +261,7 @@
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:layout_gravity="center"
+                    android:importantForAccessibility="no"
                     android:src="@drawable/ic_play" />
             </FrameLayout>
         </LinearLayout>

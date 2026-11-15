@@ -12,4 +12,24 @@
         <item name="android:statusBarColor">#0A0913</item>
         <item name="android:navigationBarColor">#0A0913</item>
     </style>
+
+    <!-- Нижние шторки (Sheet): тёмная — с экрана плеера, светлая — для светлой темы -->
+    <style name="Theme.MuzLove.Sheet.Dark" parent="Theme.Design.BottomSheetDialog">
+        <item name="colorAccent">#F4FE52</item>
+        <item name="colorControlActivated">#F4FE52</item>
+    </style>
+
+    <style name="Theme.MuzLove.Sheet.Light" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="colorAccent">#8B5CF6</item>
+        <item name="colorControlActivated">#8B5CF6</item>
+    </style>
+
+    <!-- Диалоги, открытые из шторок -->
+    <style name="Theme.MuzLove.Alert.Dark" parent="Theme.AppCompat.Dialog.Alert">
+        <item name="colorAccent">#F4FE52</item>
+    </style>
+
+    <style name="Theme.MuzLove.Alert.Light" parent="Theme.AppCompat.Light.Dialog.Alert">
+        <item name="colorAccent">#8B5CF6</item>
+    </style>
 </resources>
