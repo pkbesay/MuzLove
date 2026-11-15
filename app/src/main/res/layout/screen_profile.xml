@@ -84,7 +84,7 @@
                 android:id="@+id/profileBio"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Слушатель Resonance"
+                android:text="\@username"
                 android:textColor="#A09CB8"
                 android:textSize="14sp"
                 android:layout_marginTop="2dp" />

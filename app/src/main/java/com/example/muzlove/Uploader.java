@@ -30,6 +30,7 @@ final class Uploader {
 
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
     private static WeakReference<MainActivity> host = new WeakReference<>(null);
+    private static int epoch = 0;          // растёт при сбросе приложения: загрузки, начатые раньше, отбрасываются
 
     /** Цвета обложек загруженных треков (по id). */
     private static final String[][] COLORS = {
@@ -50,6 +51,9 @@ final class Uploader {
     /** Активность, которой сообщить о конце загрузки (последняя созданная). */
     static void attach(MainActivity a) { host = new WeakReference<>(a); }
 
+    /** Сброс приложения: то, что ещё копируется, не попадёт в данные (файлы удалятся по окончании). */
+    static void cancelPending() { epoch++; }
+
     static void start(Context c, List<Uri> uris) {
         if (uris == null || uris.isEmpty()) return;
         Context app = c.getApplicationContext();
@@ -58,6 +62,7 @@ final class Uploader {
         if (todo.isEmpty()) return;
         Toast.makeText(app, "Загружаем…", Toast.LENGTH_SHORT).show();
         Handler main = new Handler(Looper.getMainLooper());
+        final int startedIn = epoch;
         IO.execute(() -> {
             List<Item> ok = new ArrayList<>();
             int failed = 0;
@@ -67,7 +72,10 @@ final class Uploader {
                 if (it != null) ok.add(it); else failed++;
             }
             int f = failed;
-            main.post(() -> finish(app, ok, f));
+            main.post(() -> {
+                if (startedIn == epoch) { finish(app, ok, f); return; }
+                for (Item it : ok) it.file.delete();         // приложение сбросили, пока файлы копировались
+            });
         });
     }
 

@@ -24,12 +24,14 @@
         <item name="colorControlActivated">#8B5CF6</item>
     </style>
 
-    <!-- Диалоги, открытые из шторок -->
+    <!-- Все AlertDialog приложения (через AppDialogs): тема по теме приложения, текст, подсказки и кнопки читаются -->
     <style name="Theme.MuzLove.Alert.Dark" parent="Theme.AppCompat.Dialog.Alert">
-        <item name="colorAccent">#F4FE52</item>
+        <item name="colorAccent">#8B5CF6</item>
+        <item name="android:windowBackground">@drawable/dialog_bg_dark</item>
     </style>
 
     <style name="Theme.MuzLove.Alert.Light" parent="Theme.AppCompat.Light.Dialog.Alert">
         <item name="colorAccent">#8B5CF6</item>
+        <item name="android:windowBackground">@drawable/dialog_bg_light</item>
     </style>
 </resources>

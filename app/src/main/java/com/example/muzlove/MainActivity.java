@@ -7,6 +7,7 @@ import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
@@ -30,18 +31,16 @@ import android.widget.TextView;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.net.Uri;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -56,10 +55,15 @@ public class MainActivity extends AppCompatActivity {
     private AppState appState;
     private PlayerSheets sheets;                             // шторки и диалоги плеера
     private ListSheets lists;                                // шторки и диалоги списков
+    private AppDialogs dialogs;                              // все AlertDialog приложения
+    private ProfileSheets profile;                           // профиль: правка, фото, спонсорство, «О приложении»
+    private SettingsScreen settings;                         // строки экрана «Настройки»
     private boolean userSeeking = false;                     // пользователь тянет ползунок или волну
     private float miniRatio = 0f;                            // прогресс для полоски мини-плеера
     private int screen = 0;                                  // 0 home, 1 search, 2 library, 3 profile, 4 settings, 5 playlist
     private boolean npOpen = false;
+    private boolean npBars = false;                          // плеер раскрыт: под системными панелями тёмный фон, значки светлые
+    private boolean hasPhoto = false;                        // на экране профиля показано фото (а не буква)
 
     // экран плейлиста и медиатека
     static final int TAB_LIKED = 0, TAB_UPLOADS = 1, TAB_PLAYLISTS = 2;
@@ -120,9 +124,9 @@ public class MainActivity extends AppCompatActivity {
             uri -> { if (uri != null) handleAvatarUpload(uri); }
     );
 
-    // ответ не важен: без разрешения музыка играет так же, просто без уведомления
+    // без разрешения музыка играет так же, просто без уведомления; строка в настройках покажет итог
     private final ActivityResultLauncher<String> notificationPermission = registerForActivityResult(
-            new ActivityResultContracts.RequestPermission(), granted -> {}
+            new ActivityResultContracts.RequestPermission(), granted -> refreshSettings()
     );
 
     // UI плеера следует за движком; слушатель активен между onStart и onStop
@@ -131,6 +135,7 @@ public class MainActivity extends AppCompatActivity {
         @Override public void onPlayStateChanged() {
             updatePlayIcons();
             if (engine.isPlaying()) askNotificationsOnce();
+            refreshSettings();                 // таймер сна мог включиться или сработать
         }
         @Override public void onProgress(int positionMs, int durationMs) { updateProgress(positionMs, durationMs); }
         @Override public void onQueueChanged() { updateModeIcons(); }
@@ -152,8 +157,11 @@ public class MainActivity extends AppCompatActivity {
 
         appState = AppState.get(this);
         engine = PlayerEngine.get(this);
+        dialogs = new AppDialogs(this);
         sheets = new PlayerSheets(this);   // до onStart: регистрирует ActivityResultLauncher
         lists = new ListSheets(this);
+        profile = new ProfileSheets(this);
+        settings = new SettingsScreen(this);
         Uploader.attach(this);             // загрузка, начатая прежней активностью, обновит эту
         light = storage.isLight();
         waveform = storage.isWaveform();
@@ -648,16 +656,23 @@ public class MainActivity extends AppCompatActivity {
         ImageView avatarIv = findViewById(R.id.profileAvatarImage);
         TextView avatarTxt = findViewById(R.id.profileAvatar);
         TextView nameTv = findViewById(R.id.profileName);
+        TextView userTv = findViewById(R.id.profileBio);
         TextView likedCount = findViewById(R.id.profileLikedCount);
         TextView playlistCount = findViewById(R.id.profilePlaylistsCount);
 
         String nm = storage.getName();
         String avUri = storage.getAvatarUri();
+        if (avUri != null && !Avatar.exists(this, avUri)) {     // файл пропал: забываем о нём, рисуем букву
+            storage.setAvatarUri(null);
+            avUri = null;
+        }
+        Bitmap photo = avUri != null ? Avatar.load(this, avUri, Math.round(dp(100))) : null;
+        hasPhoto = photo != null;
 
-        if (avUri != null) {
+        if (hasPhoto) {
             avatarIv.setVisibility(View.VISIBLE);
             avatarTxt.setVisibility(View.GONE);
-            avatarIv.setImageURI(Uri.parse(avUri));
+            avatarIv.setImageBitmap(photo);
 
             // Скругление для ImageView
             GradientDrawable shape = new GradientDrawable();
@@ -672,16 +687,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         } else {
+            avatarIv.setImageDrawable(null);
             avatarIv.setVisibility(View.GONE);
             avatarTxt.setVisibility(View.VISIBLE);
             GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                     new int[]{0xFF8B5CF6, 0xFFEC4899});
             g.setShape(GradientDrawable.OVAL);
             avatarTxt.setBackground(g);
-            avatarTxt.setText(nm.isEmpty() ? "M" : nm.substring(0, 1).toUpperCase(Locale.ROOT));
+            avatarTxt.setText(Username.initial(nm));
         }
 
         if (nameTv != null) nameTv.setText(nm);
+        if (userTv != null) userTv.setText("@" + storage.getUsername());
         if (likedCount != null) likedCount.setText(String.valueOf(appState.liked().size()));
         if (playlistCount != null)
             playlistCount.setText(String.valueOf(appState.allPlaylists().size()));
@@ -695,13 +712,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.btnCreatePlaylist).setOnClickListener(v -> createPlaylist(null, !light));
         findViewById(R.id.btnUploadMusic).setOnClickListener(v -> pickMusicFile());
         findViewById(R.id.btnSettingsInProfile).setOnClickListener(v -> showScreen(4));
-        findViewById(R.id.btnSponsorship).setOnClickListener(v -> toast("Временно недоступно"));
+        findViewById(R.id.btnSponsorship).setOnClickListener(v -> profile.showSponsor());
 
         View avContainer = findViewById(R.id.profileAvatarContainer);
-        if (avContainer != null) avContainer.setOnClickListener(v -> avatarPicker.launch("image/*"));
+        if (avContainer != null) avContainer.setOnClickListener(v -> {
+            if (hasPhoto) profile.showAvatarMenu();
+            else pickAvatar();
+        });
 
         View edit = findViewById(R.id.btnEditName);
-        if (edit != null) edit.setOnClickListener(v -> editNameDialog());
+        if (edit != null) edit.setOnClickListener(v -> profile.showEditProfile());
 
         applyProfileTheme();
     }
@@ -831,21 +851,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ---------- настройки ----------
-    private void setupSettingsContent() {
-        settingsList.removeAllViews();
-        settingsList.addView(settingRow("Тёмная тема", !light ? "Вкл" : "Выкл", () -> {
-            light = !light; storage.setLight(light); applyTheme(); setupSettingsContent();
-        }));
-        settingsList.addView(settingRow("Звуковая волна", waveform ? "Вкл" : "Выкл", () -> {
-            waveform = !waveform; storage.setWaveform(waveform); applyWaveformSetting(); setupSettingsContent();
-        }));
-        settingsList.addView(settingRow("Изменить имя", storage.getName(), this::editNameDialog));
-        settingsList.addView(settingRow("О приложении", "Resonance 1.7", () ->
-                new AlertDialog.Builder(this).setTitle("Resonance")
-                        .setMessage("Музыкальный плеер.\nВерсия 1.7\n(Автоскрытие шапки и настроек)").setPositiveButton("OK", null).show()));
+    private void setupSettingsContent() { settings.fill(settingsList); }
+
+    /** Строки настроек обновляются, только пока открыт экран «Настройки» (шторки, ответ на запрос разрешения). */
+    void refreshSettings() {
+        if (screen == 4 && settings != null && !isFinishing() && !isDestroyed()) setupSettingsContent();
     }
 
-    private View settingRow(String title, String value, Runnable onClick) {
+    void toggleTheme() {
+        light = !light;
+        storage.setLight(light);
+        applyTheme();
+        setupSettingsContent();
+    }
+
+    void toggleWaveform() {
+        waveform = !waveform;
+        storage.setWaveform(waveform);
+        applyWaveformSetting();
+        setupSettingsContent();
+    }
+
+    boolean isWaveform() { return waveform; }
+
+    /** Имя или @username изменились. */
+    void onProfileChanged() {
+        if (screen == 3) setupProfileContent();
+        if (screen == 4) setupSettingsContent();
+    }
+
+    /** Запрос разрешения на уведомления из «Настроек» (Android 13+). */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.TIRAMISU)
+    void requestNotificationPermission() {
+        try { notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS); }
+        catch (RuntimeException e) { toast("Не удалось открыть запрос разрешения"); }
+    }
+
+    /** Сброс приложения: то, что живёт в памяти процесса дольше активности. */
+    void onAppReset() { libTab = TAB_LIKED; }
+
+    View settingRow(String title, String value, Runnable onClick) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -872,29 +917,6 @@ public class MainActivity extends AppCompatActivity {
         return row;
     }
 
-    private void editNameDialog() {
-        final EditText in = new EditText(this);
-        in.setText(storage.getName());
-        in.setTextColor(cText);
-        in.setHintTextColor(cMuted);
-        FrameLayout wrap = new FrameLayout(this);
-        int p = (int) dp(20);
-        wrap.setPadding(p, (int) dp(8), p, 0);
-        wrap.addView(in);
-        new AlertDialog.Builder(this)
-                .setTitle("Имя профиля")
-                .setView(wrap)
-                .setPositiveButton("Сохранить", (d, w) -> {
-                    String n = in.getText().toString().trim();
-                    if (n.isEmpty()) n = "Меломан";
-                    storage.setName(n);
-                    if (screen == 3) setupProfileContent();
-                    if (screen == 4) setupSettingsContent();
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
-    }
-
     // ---------- плейлисты и загрузка ----------
     /** Создание плейлиста (Профиль, карточка на Главной, «Моё», выбор плейлиста для трека forTrack). */
     void createPlaylist(Track forTrack, boolean dark) { lists.createPlaylist(forTrack, dark); }
@@ -911,19 +933,27 @@ public class MainActivity extends AppCompatActivity {
         else refreshVisible();
     }
 
+    /** Выбор фото профиля (системный выбор картинки). */
+    void pickAvatar() {
+        try { avatarPicker.launch("image/*"); }
+        catch (ActivityNotFoundException e) { toast("Нет подходящего приложения"); }
+    }
+
+    /** «Удалить фото»: файл стирается, снова буква. */
+    void removeAvatar() {
+        Avatar.delete(this, storage.getAvatarUri());
+        storage.setAvatarUri(null);
+        setupProfileContent();
+        toast("Фото удалено");
+    }
+
     private void handleAvatarUpload(Uri uri) {
         try {
-            // Копируем во внутреннюю память, чтобы иметь постоянный доступ
-            File dest = new File(getFilesDir(), "avatar_" + System.currentTimeMillis() + ".jpg");
-            try (InputStream in = getContentResolver().openInputStream(uri);
-                 OutputStream out = new FileOutputStream(dest)) {
-                byte[] buf = new byte[8192];
-                int n;
-                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-            }
-            storage.setAvatarUri(Uri.fromFile(dest).toString());
+            String old = storage.getAvatarUri();
+            storage.setAvatarUri(Avatar.save(this, uri));     // копия во внутренней памяти — постоянный доступ
+            Avatar.delete(this, old);                         // прежний файл больше не нужен
             setupProfileContent();
-        } catch (Exception e) {
+        } catch (IOException | RuntimeException e) {
             toast("Ошибка при загрузке фото");
         }
     }
@@ -1095,13 +1125,20 @@ public class MainActivity extends AppCompatActivity {
 
         updateLikeIcons();
 
-        // Приятный темный градиент для фона плеера
-        GradientDrawable npBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
+        npOverlay.setBackground(playerBackground());
+    }
+
+    /** Приятный тёмный градиент для фона плеера (и для области за системными панелями, пока плеер открыт). */
+    private static GradientDrawable playerBackground() {
+        return new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{0xFF1A1826, 0xFF121019, 0xFF0D0C14});
-        npOverlay.setBackground(npBg);
     }
 
     private void updateLiveBackground(Track t) {
+        if (npBars) {                       // плеер всегда тёмный: за панелями виден его фон
+            root.setBackground(playerBackground());
+            return;
+        }
         if (light) {
             root.setBackgroundColor(Color.WHITE);
             return;
@@ -1122,7 +1159,18 @@ public class MainActivity extends AppCompatActivity {
     private void openNowPlaying(boolean open) {
         npOpen = open;
         int screenH = getResources().getDisplayMetrics().heightPixels;
-        npOverlay.animate().translationY(open ? 0 : screenH).setDuration(340).start();
+        if (open) {
+            // панели темнеют, когда плеер выехал: пока он едет, под ними ещё светлый экран
+            npOverlay.animate().translationY(0).setDuration(340).withEndAction(() -> {
+                if (!npOpen || isDestroyed()) return;
+                npBars = true;
+                applySystemBars();
+            }).start();
+        } else {
+            npBars = false;                 // обратно — сразу, плеер уезжает и открывает светлый экран
+            applySystemBars();
+            npOverlay.animate().translationY(screenH).setDuration(340).start();
+        }
     }
 
     private void applyScreenVisibility(int s) {
@@ -1235,6 +1283,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        refreshSettings();                    // из системных настроек уведомлений мог вернуться другой ответ
+    }
+
+    @Override
     protected void onStop() {
         if (engine != null) engine.removeListener(engineListener);
         super.onStop();                       // воспроизведение продолжается
@@ -1244,6 +1298,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         if (sheets != null) sheets.dismissAll();   // окна шторок и их слушатели движка не переживают активность
         if (lists != null) lists.dismissAll();
+        if (profile != null) profile.dismissAll();
+        if (dialogs != null) dialogs.dismissAll();
         super.onDestroy();
     }
 
@@ -1252,6 +1308,8 @@ public class MainActivity extends AppCompatActivity {
     AppState appState() { return appState; }
     PlayerSheets playerSheets() { return sheets; }
     ListSheets lists() { return lists; }
+    AppDialogs dialogs() { return dialogs; }
+    ProfileSheets profileSheets() { return profile; }
     /** true — светлая тема приложения (шторки вне плеера следуют ей: dark = !isLightTheme()). */
     boolean isLightTheme() { return light; }
 
@@ -1266,14 +1324,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void applyTheme() {
         computeTheme();
-        getWindow().setStatusBarColor(cBase);
-        getWindow().setNavigationBarColor(cBase);
-        View dec = getWindow().getDecorView();
-        int f = dec.getSystemUiVisibility();
-        if (light) f |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR; else f &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
-        dec.setSystemUiVisibility(f);
-
-        root.setBackgroundColor(cBase); // Светлая тема теперь полностью белая
+        applySystemBars();                 // панели, значки на них и фон под ними (светлая тема — белая)
 
         h1.setTextColor(cText);
         eyebrow.setTextColor(cMuted);
@@ -1303,9 +1354,25 @@ public class MainActivity extends AppCompatActivity {
 
         adapter.setLight(light);
         updateLikeIcons();                 // цвет сердечка мини-плеера зависит от темы
-        if (!light) updateLiveBackground(currentOrFirst());
         rebuildPlaylistsRow();
         applyProfileTheme();
+    }
+
+    /** Системные панели: цвет (до Android 15; дальше они прозрачны и виден фон root), светлые или тёмные значки
+     *  и фон под панелями. Тёмные значки — только в светлой теме и пока плеер закрыт (он всегда тёмный). */
+    @SuppressWarnings("deprecation")
+    private void applySystemBars() {
+        boolean lightBars = light && !npBars;
+        android.view.Window w = getWindow();
+        w.setStatusBarColor(npBars ? 0xFF1A1826 : cBase);
+        w.setNavigationBarColor(npBars ? 0xFF0D0C14 : cBase);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) w.setNavigationBarContrastEnforced(false);
+        WindowInsetsControllerCompat c = WindowCompat.getInsetsController(w, w.getDecorView());
+        c.setAppearanceLightStatusBars(lightBars);
+        c.setAppearanceLightNavigationBars(lightBars);
+        if (root == null) return;
+        if (light && !npBars) root.setBackgroundColor(cBase);       // светлая тема полностью белая
+        else updateLiveBackground(currentOrFirst());
     }
 
     private void applyProfileTheme() {

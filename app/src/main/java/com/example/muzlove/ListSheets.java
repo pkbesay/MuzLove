@@ -1,28 +1,17 @@
 package com.example.muzlove;
 
-import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.text.Editable;
-import android.text.InputFilter;
-import android.text.InputType;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.view.inputmethod.EditorInfo;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
-import androidx.appcompat.app.AlertDialog;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -39,21 +28,18 @@ final class ListSheets {
     private final PlayerEngine engine;
     private final AppState state;
     private final List<Sheet> openSheets = new ArrayList<>();
-    private final List<AlertDialog> openDialogs = new ArrayList<>();
+    private final AppDialogs dialogs;
 
     ListSheets(MainActivity a) {
         this.a = a;
         this.engine = a.engine();
         this.state = a.appState();
+        this.dialogs = a.dialogs();
     }
 
     void dismissAll() {
         for (Sheet s : new ArrayList<>(openSheets)) s.dismiss();
-        for (AlertDialog d : new ArrayList<>(openDialogs)) {
-            try { if (d.isShowing()) d.dismiss(); } catch (RuntimeException ignored) {}
-        }
         openSheets.clear();
-        openDialogs.clear();
     }
 
     private boolean dark() { return !a.isLightTheme(); }
@@ -117,7 +103,7 @@ final class ListSheets {
         if (t.id >= 1000 && state.find(t.id) != null) {
             s.addRow(R.drawable.ic_trash, "Удалить трек", null, false, () -> {
                 s.dismiss();
-                confirm(dark, "Удалить трек?",
+                dialogs.confirm(dark, "Удалить трек?",
                         "«" + t.title + "» будет удалён с устройства, из любимых и из всех плейлистов.",
                         "Удалить", () -> a.deleteUploadedTrack(t.id));
             });
@@ -161,7 +147,7 @@ final class ListSheets {
     }
 
     private void rename(Playlist p) {
-        input(dark(), "Переименовать плейлист", p.name, "Название плейлиста", "Сохранить", false, name -> {
+        dialogs.input(dark(), "Переименовать плейлист", p.name, "Название плейлиста", "Сохранить", false, Playlists.MAX_NAME, name -> {
             if (!state.customPlaylists().contains(p)) return;
             p.name = name;
             state.savePlaylists();
@@ -170,7 +156,7 @@ final class ListSheets {
     }
 
     private void confirmDelete(Playlist p) {
-        confirm(dark(), "Удалить плейлист?",
+        dialogs.confirm(dark(), "Удалить плейлист?",
                 "«" + Playlists.name(p.name) + "» исчезнет из медиатеки. Сами треки останутся в приложении.",
                 "Удалить", () -> {
                     if (!state.customPlaylists().remove(p)) return;
@@ -184,7 +170,7 @@ final class ListSheets {
     /** Новый плейлист: название, затем выбор треков (отмечены любимые). forTrack != null — плейлист
      *  сразу создаётся с этим треком (из выбора плейлиста для трека), без выбора треков. */
     void createPlaylist(Track forTrack, boolean dark) {
-        input(dark, "Новый плейлист", null, "Мой плейлист", "Создать", true, raw -> {
+        dialogs.input(dark, "Новый плейлист", null, "Мой плейлист", "Создать", true, Playlists.MAX_NAME, raw -> {
             String name = raw.isEmpty() ? "Мой плейлист" : raw;
             if (forTrack != null) { finishCreate(name, new int[]{forTrack.id}); return; }
             List<Integer> liked = new ArrayList<>();
@@ -302,86 +288,6 @@ final class ListSheets {
         mark.setBackground(g);
         ((ViewGroup) mark).getChildAt(0).setVisibility(on ? View.VISIBLE : View.INVISIBLE);
         row.setContentDescription(t.title + ", " + t.artist + (on ? ", выбран" : ", не выбран"));
-    }
-
-    // ======================= диалоги =======================
-    /** Подтверждение: «Отмена» и positive (выполняет ok). */
-    void confirm(boolean dark, String title, String message, String positive, Runnable ok) {
-        if (gone()) return;
-        AlertDialog d = new AlertDialog.Builder(a, dark ? R.style.Theme_MuzLove_Alert_Dark : R.style.Theme_MuzLove_Alert_Light)
-                .setTitle(title)
-                .setMessage(message)
-                .setPositiveButton(positive, (x, w) -> ok.run())
-                .setNegativeButton("Отмена", null)
-                .create();
-        track(d);
-        d.show();
-    }
-
-    /** Ввод названия (не длиннее Playlists.MAX_NAME). allowEmpty == false — кнопка недоступна, пока поле
-     *  пустое. ok получает обрезанный по краям текст. */
-    void input(boolean dark, String title, String initial, String hint, String positive,
-               boolean allowEmpty, Consumer<String> ok) {
-        if (gone()) return;
-        AlertDialog.Builder b = new AlertDialog.Builder(a,
-                dark ? R.style.Theme_MuzLove_Alert_Dark : R.style.Theme_MuzLove_Alert_Light);
-        Context c = b.getContext();
-        EditText in = new EditText(c);
-        in.setHint(hint);
-        in.setSingleLine(true);
-        in.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        in.setImeOptions(EditorInfo.IME_ACTION_DONE);
-        in.setFilters(new InputFilter[]{new InputFilter.LengthFilter(Playlists.MAX_NAME)});
-        if (initial != null) {
-            in.setText(initial);
-            in.setSelection(in.length());
-        }
-        FrameLayout wrap = new FrameLayout(c);
-        int p = Math.round(20 * c.getResources().getDisplayMetrics().density);
-        wrap.setPadding(p, p / 2, p, 0);
-        wrap.addView(in);
-        AlertDialog d = b.setTitle(title)
-                .setView(wrap)
-                .setPositiveButton(positive, null)      // обработчик ниже: диалог не закрывается с пустым полем
-                .setNegativeButton("Отмена", null)
-                .create();
-        if (d.getWindow() != null)
-            d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        Runnable submit = () -> {
-            String v = in.getText().toString().trim();
-            if (v.isEmpty() && !allowEmpty) return;
-            d.dismiss();
-            ok.accept(v);
-        };
-        d.setOnShowListener(x -> {
-            Button pb = d.getButton(AlertDialog.BUTTON_POSITIVE);
-            if (pb == null) return;
-            pb.setOnClickListener(v -> submit.run());
-            if (!allowEmpty) pb.setEnabled(in.getText().toString().trim().length() > 0);
-        });
-        if (!allowEmpty) {
-            in.addTextChangedListener(new TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int st, int c1, int a1) {}
-                @Override public void onTextChanged(CharSequence s, int st, int b1, int c1) {}
-                @Override public void afterTextChanged(Editable e) {
-                    Button pb = d.getButton(AlertDialog.BUTTON_POSITIVE);
-                    if (pb != null) pb.setEnabled(e.toString().trim().length() > 0);
-                }
-            });
-        }
-        in.setOnEditorActionListener((v, id, e) -> {
-            if (id != EditorInfo.IME_ACTION_DONE) return false;
-            submit.run();
-            return true;
-        });
-        track(d);
-        d.show();
-        in.requestFocus();
-    }
-
-    private void track(AlertDialog d) {
-        openDialogs.add(d);
-        d.setOnDismissListener(x -> openDialogs.remove(d));
     }
 
     private void toast(String s) { Toast.makeText(a, s, Toast.LENGTH_SHORT).show(); }

@@ -112,6 +112,22 @@ public final class AppState {
         } catch (IOException | SecurityException ignored) {}
     }
 
+    /** Сброс приложения: файлы загруженных треков и аватар удалены, настройки стёрты, данные прочитаны заново
+     *  (как при первом запуске). Движок остановить заранее — PlayerEngine.stop(). */
+    public void wipe() {
+        for (Track t : new ArrayList<>(uploaded)) deleteOwnFile(t.url);
+        Avatar.delete(app, storage.getAvatarUri());
+        File[] files = app.getFilesDir().listFiles();            // копии без записи в настройках
+        if (files != null) {
+            for (File f : files) {
+                String n = f.getName();
+                if (f.isFile() && (n.startsWith("track_") || n.startsWith("avatar_"))) f.delete();
+            }
+        }
+        storage.clearAll();
+        reload();
+    }
+
     // ---------- лайки ----------
     public Set<Integer> liked() { return liked; }
 

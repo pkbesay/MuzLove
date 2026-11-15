@@ -140,6 +140,14 @@ public final class EqualizerController {
         save();
     }
 
+    /** Сброс приложения: настройки по умолчанию, только в памяти (хранилище уже стёрто). */
+    void resetToDefaults() {
+        release();
+        enabled = false;
+        preset = -1;
+        levels = new int[0];
+    }
+
     public void save() {
         storage.setEqPreset(preset);
         storage.setEqBands(levels);

@@ -51,7 +51,7 @@ final class PlayerSheets {
             TYPE_BLE_SPEAKER = 27, TYPE_HDMI_EARC = 29, TYPE_BLE_BROADCAST = 30, TYPE_DOCK_ANALOG = 31;
 
     /** Последний выбранный вариант таймера сна (живёт вместе с процессом, как и PlayerEngine). */
-    private static int sleepChoice = 0;
+    static int sleepChoice = 0;
 
     private final MainActivity a;
     private final PlayerEngine engine;
@@ -76,7 +76,7 @@ final class PlayerSheets {
     private Sheet sheet(boolean dark, CharSequence title) {
         Sheet s = Sheet.create(a, dark, title);
         openSheets.add(s);
-        s.onDismiss(() -> openSheets.remove(s));
+        s.onDismiss(() -> { openSheets.remove(s); a.refreshSettings(); });   // в «Настройках» значения строк могли смениться
         return s;
     }
 

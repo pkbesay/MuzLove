@@ -1,5 +1,6 @@
 package com.example.muzlove;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import com.google.gson.Gson;
@@ -8,6 +9,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 
 public class StorageManager {
@@ -15,6 +17,7 @@ public class StorageManager {
     private static final String KEY_PLAYLISTS = "custom_playlists";
     private static final String KEY_TRACKS = "uploaded_tracks";
     private static final String KEY_NAME = "profile_name";
+    private static final String KEY_USERNAME = "profile_username";
     private static final String KEY_LIGHT = "theme_light";
     private static final String KEY_THEME_INITIALIZED = "theme_initialized";
     private static final String KEY_WAVE = "waveform_on";
@@ -72,6 +75,17 @@ public class StorageManager {
     // ---- имя профиля ----
     public String getName() { return prefs.getString(KEY_NAME, "Меломан"); }
     public void setName(String name) { prefs.edit().putString(KEY_NAME, name).apply(); }
+
+    // ---- @username: у тех, кто регистрировался раньше, создаётся из имени при первом чтении ----
+    public String getUsername() {
+        String u = prefs.getString(KEY_USERNAME, null);
+        if (!Username.isValid(u)) {
+            u = Username.fromName(getName(), new Random());
+            setUsername(u);
+        }
+        return u;
+    }
+    public void setUsername(String username) { prefs.edit().putString(KEY_USERNAME, username).apply(); }
 
     // ---- тема ----
     public boolean isLight() {
@@ -181,5 +195,11 @@ public class StorageManager {
 
     public void clearSearchHistory() {
         prefs.edit().remove(KEY_SEARCH_HISTORY).apply();
+    }
+
+    /** Стирает все сохранённые данные приложения (сброс); commit — чтобы запись точно ушла до перезапуска экранов. */
+    @SuppressLint("ApplySharedPref")
+    public void clearAll() {
+        prefs.edit().clear().commit();
     }
 }

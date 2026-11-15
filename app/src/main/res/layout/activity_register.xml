@@ -1,71 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/regScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#0A0913"
-    android:orientation="vertical"
-    android:gravity="center"
-    android:padding="32dp">
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:scrollbars="none">
 
-    <ImageView
-        android:layout_width="100dp"
-        android:layout_height="100dp"
-        android:src="@drawable/muzlove_logo" />
-
-    <TextView
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Добро пожаловать"
-        android:textColor="#FFFFFF"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:layout_marginTop="24dp" />
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Как нам вас называть?"
-        android:textColor="#A09CB8"
-        android:textSize="16sp"
-        android:layout_marginTop="8dp" />
+        <ImageView
+            android:layout_width="100dp"
+            android:layout_height="100dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/muzlove_logo" />
 
-    <EditText
-        android:id="@+id/etRegName"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@drawable/search_bg"
-        android:layout_marginTop="32dp"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:hint="Ваше имя"
-        android:textColorHint="#6B6880"
-        android:textColor="#FFFFFF"
-        android:inputType="textPersonName"
-        android:maxLines="1" />
-    <EditText
-        android:id="@+id/uzerName"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:background="@drawable/search_bg"
-        android:layout_marginTop="32dp"
-        android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:hint="@uzer name"
-        android:textColorHint="#6B6880"
-        android:textColor="#FFFFFF"
-        android:inputType="textPersonName"
-        android:maxLines="1" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Добро пожаловать"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_marginTop="24dp" />
 
-    <Button
-        android:id="@+id/btnRegister"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:layout_marginTop="24dp"
-        android:backgroundTint="#8B5CF6"
-        android:text="Начать"
-        android:textColor="#FFFFFF"
-        android:textAllCaps="false"
-        android:textSize="16sp"
-        android:textStyle="bold" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Как нам вас называть?"
+            android:textColor="#A09CB8"
+            android:textSize="16sp"
+            android:layout_marginTop="8dp" />
 
-</LinearLayout>
+        <EditText
+            android:id="@+id/etRegName"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/search_bg"
+            android:layout_marginTop="32dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:hint="Ваше имя"
+            android:importantForAutofill="no"
+            android:imeOptions="actionNext"
+            android:inputType="textPersonName"
+            android:maxLength="30"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6B6880" />
+
+        <EditText
+            android:id="@+id/uzerName"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@drawable/search_bg"
+            android:layout_marginTop="12dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:hint="\@username (необязательно)"
+            android:importantForAutofill="no"
+            android:imeOptions="actionDone"
+            android:inputType="textNoSuggestions"
+            android:maxLength="40"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6B6880" />
+
+        <Button
+            android:id="@+id/btnRegister"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="24dp"
+            android:backgroundTint="#8B5CF6"
+            android:text="Начать"
+            android:textColor="#FFFFFF"
+            android:textAllCaps="false"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+</ScrollView>

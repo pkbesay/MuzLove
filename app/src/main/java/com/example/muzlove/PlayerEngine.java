@@ -322,6 +322,16 @@ public final class PlayerEngine {
         notifyQueue();
     }
 
+    /** Сброс приложения: остановить всё и вернуть режимы к умолчанию (только в памяти — настройки стирает
+     *  AppState.wipe(), порядок: stop() -> wipe() -> resetToDefaults()). */
+    public void resetToDefaults() {
+        stop();
+        queue.setShuffle(false);
+        queue.setRepeat(PlayQueue.REPEAT_OFF);
+        equalizer.resetToDefaults();
+        notifyQueue();
+    }
+
     // ---------- таймер сна ----------
     /** 0 — отменить. */
     public void setSleepTimer(int minutes) {
