@@ -35,6 +35,16 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.VH> {
         notifyDataSetChanged();
     }
 
+    /** Копия показанного списка (для очереди воспроизведения). */
+    public List<Track> getItems() { return new ArrayList<>(items); }
+
+    /** id показанных треков по порядку. */
+    public List<Integer> ids() {
+        List<Integer> out = new ArrayList<>(items.size());
+        for (Track t : items) out.add(t.id);
+        return out;
+    }
+
     public void setCurrent(int id) { currentId = id; notifyDataSetChanged(); }
     public void setLight(boolean l) { light = l; notifyDataSetChanged(); }
     public void refreshLikes() { notifyDataSetChanged(); }

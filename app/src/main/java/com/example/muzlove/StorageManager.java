@@ -22,6 +22,9 @@ public class StorageManager {
     private static final String KEY_REGISTERED = "is_registered";
     private static final String KEY_AVATAR = "profile_avatar";
     private static final String KEY_SEARCH_HISTORY = "search_history";
+    private static final String KEY_SHUFFLE = "player_shuffle";
+    private static final String KEY_REPEAT = "player_repeat";
+    private static final String KEY_NOTIF_ASKED = "notifications_asked";
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -40,8 +43,11 @@ public class StorageManager {
         String json = prefs.getString(KEY_PLAYLISTS, null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<Playlist>>() {}.getType();
-        List<Playlist> list = gson.fromJson(json, type);
-        return list != null ? list : new ArrayList<>();
+        List<Playlist> list = null;
+        try { list = gson.fromJson(json, type); } catch (RuntimeException ignored) {}
+        List<Playlist> out = new ArrayList<>();
+        if (list != null) for (Playlist p : list) if (p != null) out.add(p);
+        return out;
     }
 
     // ---- загруженные треки ----
@@ -53,8 +59,11 @@ public class StorageManager {
         String json = prefs.getString(KEY_TRACKS, null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<Track>>() {}.getType();
-        List<Track> list = gson.fromJson(json, type);
-        return list != null ? list : new ArrayList<>();
+        List<Track> list = null;
+        try { list = gson.fromJson(json, type); } catch (RuntimeException ignored) {}
+        List<Track> out = new ArrayList<>();
+        if (list != null) for (Track t : list) if (t != null) out.add(t);
+        return out;
     }
 
     // ---- имя профиля ----
@@ -78,6 +87,16 @@ public class StorageManager {
     public boolean isWaveform() { return prefs.getBoolean(KEY_WAVE, true); }
     public void setWaveform(boolean v) { prefs.edit().putBoolean(KEY_WAVE, v).apply(); }
 
+    // ---- режимы плеера: перемешивание и повтор (0 выкл, 1 все, 2 один) ----
+    public boolean getShuffle() { return prefs.getBoolean(KEY_SHUFFLE, false); }
+    public void setShuffle(boolean v) { prefs.edit().putBoolean(KEY_SHUFFLE, v).apply(); }
+    public int getRepeat() { return prefs.getInt(KEY_REPEAT, 0); }
+    public void setRepeat(int v) { prefs.edit().putInt(KEY_REPEAT, v).apply(); }
+
+    // ---- разрешение на уведомления уже запрашивали (API 33+, спрашиваем один раз) ----
+    public boolean wasNotificationsAsked() { return prefs.getBoolean(KEY_NOTIF_ASKED, false); }
+    public void setNotificationsAsked() { prefs.edit().putBoolean(KEY_NOTIF_ASKED, true).apply(); }
+
     // ---- лайки ----
     public void saveLikes(Set<Integer> likes) {
         prefs.edit().putString(KEY_LIKES, gson.toJson(new ArrayList<>(likes))).apply();
@@ -87,8 +106,11 @@ public class StorageManager {
         String json = prefs.getString(KEY_LIKES, null);
         if (json == null) return null; // null => первый запуск, поставим значения по умолчанию
         Type type = new TypeToken<ArrayList<Integer>>() {}.getType();
-        List<Integer> list = gson.fromJson(json, type);
-        return list != null ? new HashSet<>(list) : new HashSet<>();
+        List<Integer> list = null;
+        try { list = gson.fromJson(json, type); } catch (RuntimeException ignored) {}
+        Set<Integer> out = new HashSet<>();
+        if (list != null) for (Integer id : list) if (id != null) out.add(id);
+        return out;
     }
 
     // ---- регистрация ----
