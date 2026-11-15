@@ -229,7 +229,8 @@
                     android:layout_height="40dp"
                     android:padding="8dp"
                     android:src="@drawable/ic_back"
-                    android:background="?attr/selectableItemBackgroundBorderless" />
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Назад" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -245,12 +246,16 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
+                <!-- снизу место под мини-плеер и навигацию: последняя строка не прячется под ними -->
                 <LinearLayout
                     android:id="@+id/settingsList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="20dp" />
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="140dp" />
             </ScrollView>
         </LinearLayout>
     </LinearLayout>
@@ -264,6 +269,7 @@
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="74dp"
+        android:contentDescription="Открыть плеер"
         android:visibility="gone">
 
         <LinearLayout

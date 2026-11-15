@@ -64,9 +64,9 @@ final class AppDialogs {
                 .create());
     }
 
-    /** Простой диалог с одной кнопкой «OK». */
+    /** Простой диалог с одной кнопкой «Закрыть». */
     void message(boolean dark, String title, String message) {
-        show(builder(dark).setTitle(title).setMessage(message).setPositiveButton("OK", null).create());
+        show(builder(dark).setTitle(title).setMessage(message).setPositiveButton("Закрыть", null).create());
     }
 
     /** Ввод строки (не длиннее maxLen). allowEmpty == false — кнопка недоступна, пока поле пустое.

@@ -11,6 +11,17 @@ public class SplashActivity extends AppCompatActivity {
 
     private static final long SPLASH_MS = 1700;
 
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    // переход дальше; отменяется, если заставку закрыли раньше («Назад»)
+    private final Runnable next = () -> {
+        if (isFinishing() || isDestroyed()) return;
+        StorageManager storage = new StorageManager(this);
+        Class<?> target = storage.isRegistered() ? MainActivity.class : RegisterActivity.class;
+        startActivity(new Intent(SplashActivity.this, target));
+        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        finish();
+    };
+
     @Override
     protected void onCreate(Bundle s) {
         super.onCreate(s);
@@ -33,13 +44,12 @@ public class SplashActivity extends AppCompatActivity {
         tagline.setAlpha(0f);
         tagline.animate().alpha(1f).setStartDelay(480).setDuration(600).start();
 
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            StorageManager storage = new StorageManager(this);
-            Class<?> target = storage.isRegistered() ? MainActivity.class : RegisterActivity.class;
-            
-            startActivity(new Intent(SplashActivity.this, target));
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-            finish();
-        }, SPLASH_MS);
+        handler.postDelayed(next, SPLASH_MS);
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(next);
+        super.onDestroy();
     }
 }

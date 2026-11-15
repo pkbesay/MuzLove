@@ -16,6 +16,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.core.graphics.ColorUtils;
+
 /** Строки и блоки над списком треков (медиатека, поиск, плейлист) в цветах текущей темы.
  *  Только главный поток. */
 final class ListViews {
@@ -45,6 +47,14 @@ final class ListViews {
         mask.setColor(Color.WHITE);
         mask.setCornerRadius(radiusPx);
         return new RippleDrawable(ColorStateList.valueOf(onDark ? 0x33FFFFFF : 0x1F000000), null, mask);
+    }
+
+    /** Цвет, читаемый на белом (контраст не ниже 3:1): слишком светлый постепенно затемняется. */
+    static int readableOnWhite(int color) {
+        int c = color | 0xFF000000;
+        for (int i = 0; i < 10 && ColorUtils.calculateContrast(c, Color.WHITE) < 3.0; i++)
+            c = ColorUtils.blendARGB(c, Color.BLACK, 0.12f);
+        return c;
     }
 
     /** Квадрат с тонкой рамкой (карточка «Новый плейлист», строки-действия). */

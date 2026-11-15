@@ -9,7 +9,7 @@ public class Data {
 
     static {
         TRACKS.add(new Track(1,  "Полуночный неон",   "Aria Voss",   "Городские огни", 215, "#FF6B6B", "#FFA94D", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"));
-        TRACKS.add(new Track(2,  "Стеклянный океан",  "Lумен",       "Глубина",        188, "#06B6D4", "#6366F1", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"));
+        TRACKS.add(new Track(2,  "Стеклянный океан",  "Лумен",       "Глубина",        188, "#06B6D4", "#6366F1", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"));
         TRACKS.add(new Track(3,  "Бархатный закат",   "Nova Kane",   "Тёплый шум",     242, "#F59E0B", "#EF4444", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"));
         TRACKS.add(new Track(4,  "Северное сияние",   "Halcyon",     "Полярность",     201, "#14B8A6", "#84CC16", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"));
         TRACKS.add(new Track(5,  "Пыльный розовый",   "Mira Sole",   "Пастель",        176, "#EC4899", "#A855F7", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"));
@@ -23,10 +23,5 @@ public class Data {
         PLAYLISTS.add(new Playlist("Тёплая волна", "Лёгкость и солнце",    "#F59E0B", "#EF4444", new int[]{3, 7, 8, 4}));
         PLAYLISTS.add(new Playlist("Фокус",        "Чтобы не отвлекаться", "#06B6D4", "#6366F1", new int[]{2, 4, 8, 6}));
         PLAYLISTS.add(new Playlist("Свежее",       "Новое за неделю",      "#EC4899", "#A855F7", new int[]{10, 5, 1, 7}));
-    }
-
-    public static Track byId(int id) {
-        for (Track t : TRACKS) if (t.id == id) return t;
-        return TRACKS.get(0);
     }
 }

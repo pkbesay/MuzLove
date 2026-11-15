@@ -329,10 +329,11 @@ public class PlaybackService extends Service {
                 .setOnlyAlertOnce(true)
                 .setOngoing(keepForeground())
                 .setColor(0xFF8B5CF6)
-                .addAction(action(R.drawable.ic_prev, "Назад", ACTION_PREV, 1))
+                // подписи — как у тех же кнопок в приложении
+                .addAction(action(R.drawable.ic_prev, "Предыдущий трек", ACTION_PREV, 1))
                 .addAction(playing ? action(R.drawable.ic_pause, "Пауза", ACTION_TOGGLE, 2)
-                                   : action(R.drawable.ic_play, "Слушать", ACTION_TOGGLE, 2))
-                .addAction(action(R.drawable.ic_next, "Далее", ACTION_NEXT, 3));
+                                   : action(R.drawable.ic_play, "Воспроизвести", ACTION_TOGGLE, 2))
+                .addAction(action(R.drawable.ic_next, "Следующий трек", ACTION_NEXT, 3));
         if (t.album != null && !t.album.isEmpty()) b.setSubText(t.album);
         Notification.MediaStyle style = new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2);
         if (session != null) style.setMediaSession(session.getSessionToken());

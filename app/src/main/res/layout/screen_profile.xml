@@ -9,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="100dp">
+        android:paddingBottom="140dp">
 
         <!-- Аватар и имя -->
         <LinearLayout
@@ -24,6 +24,7 @@
                 android:id="@+id/profileAvatarContainer"
                 android:layout_width="100dp"
                 android:layout_height="100dp"
+                android:contentDescription="Фото профиля"
                 android:clickable="true"
                 android:focusable="true">
 
@@ -66,8 +67,11 @@
                     android:text="Меломан"
                     android:textColor="#FFFFFF"
                     android:textSize="24sp"
-                    android:textStyle="bold" />
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
 
+                <!-- ширину имени ограничивает код: длинное имя не вытесняет карандаш за край -->
                 <ImageView
                     android:id="@+id/btnEditName"
                     android:layout_width="36dp"
@@ -76,6 +80,7 @@
                     android:layout_marginStart="4dp"
                     android:src="@drawable/ic_edit"
                     app:tint="#FFFFFF"
+                    android:contentDescription="Изменить профиль"
                     android:clickable="true"
                     android:focusable="true" />
             </LinearLayout>

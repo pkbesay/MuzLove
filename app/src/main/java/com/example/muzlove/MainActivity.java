@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
@@ -175,10 +176,12 @@ public class MainActivity extends AppCompatActivity {
 
         applyWaveformSetting();
 
-        // Обработка системных отступов (чтобы не перекрывалось виджетами телефона)
+        // Обработка системных отступов (чтобы не перекрывалось виджетами телефона). Клавиатура — тоже:
+        // с Android 15 окно во весь экран и adjustResize его не сжимает, низ списка поиска ушёл бы под неё
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (v, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars());
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            androidx.core.graphics.Insets ime = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime());
+            v.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, ime.bottom));
             return insets;
         });
 
@@ -650,6 +653,7 @@ public class MainActivity extends AppCompatActivity {
         libTab = tab;
         fillContent();
         recycler.scrollToPosition(0);
+        if (engine.isStarted()) openMini();   // короткий список не прокрутить, чтобы вернуть мини-плеер
     }
 
     private void setupProfileContent() {
@@ -697,7 +701,11 @@ public class MainActivity extends AppCompatActivity {
             avatarTxt.setText(Username.initial(nm));
         }
 
-        if (nameTv != null) nameTv.setText(nm);
+        if (nameTv != null) {
+            nameTv.setText(nm);
+            // отступы экрана (2×20dp) и карандаш (36 + 4dp): длинное имя сокращается многоточием
+            nameTv.setMaxWidth(Math.max((int) dp(80), getResources().getDisplayMetrics().widthPixels - (int) dp(88)));
+        }
         if (userTv != null) userTv.setText("@" + storage.getUsername());
         if (likedCount != null) likedCount.setText(String.valueOf(appState.liked().size()));
         if (playlistCount != null)
@@ -910,9 +918,14 @@ public class MainActivity extends AppCompatActivity {
 
         TextView v = new TextView(this);
         v.setText(value); v.setTextColor(cMuted); v.setTextSize(14);
+        v.setSingleLine(true);                                   // длинное имя не сжимает название строки
+        v.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        v.setMaxWidth((int) dp(150));
+        v.setPadding((int) dp(12), 0, 0, 0);
 
         row.addView(t); row.addView(v);
         row.setClickable(true); row.setFocusable(true);
+        row.setForeground(ListViews.rippleRounded(!light, dp(14)));
         row.setOnClickListener(x -> onClick.run());
         return row;
     }
@@ -1094,6 +1107,8 @@ public class MainActivity extends AppCompatActivity {
         int r = engine.repeatMode();
         btnRepeat.setImageResource(r == 2 ? R.drawable.ic_repeat_one : R.drawable.ic_repeat);
         btnRepeat.setColorFilter(r != 0 ? accent : off);
+        btnShuffle.setContentDescription(engine.isShuffle() ? "Перемешивание: включено" : "Перемешивание: выключено");
+        btnRepeat.setContentDescription(r == 2 ? "Повтор: один трек" : r == 1 ? "Повтор: все треки" : "Повтор: выключен");
     }
 
     private void updateLikeIcons() {
@@ -1101,7 +1116,8 @@ public class MainActivity extends AppCompatActivity {
         if (t == null) return;
         boolean isLiked = appState.isLiked(t.id);
         npLike.setColorFilter(isLiked ? 0xFFF4FE52 : Color.WHITE);
-        miniLike.setColorFilter(isLiked ? t.c1 : (light ? 0xFF15131F : 0xFFC9C5DE));
+        int likedColor = light ? ListViews.readableOnWhite(t.c1) : t.c1;
+        miniLike.setColorFilter(isLiked ? likedColor : (light ? 0xFF15131F : 0xFFC9C5DE));
         String cd = isLiked ? "Убрать из любимых" : "Добавить в любимые";
         npLike.setContentDescription(cd);
         miniLike.setContentDescription(cd);
@@ -1118,6 +1134,7 @@ public class MainActivity extends AppCompatActivity {
 
         npTitle.setText(t.title); npArtist.setText(t.artist); npAlbum.setText(t.album);
         miniTitle.setText(t.title); miniArtist.setText(t.artist);
+        miniPlayer.setContentDescription(t.title + ", " + t.artist + ". Открыть плеер");
         miniProgress.setBackgroundColor(t.c1);
 
         wave.setSeed(t.id);
@@ -1149,11 +1166,10 @@ public class MainActivity extends AppCompatActivity {
         root.setBackground(bg);
     }
 
+    /** Показать мини-плеер (и вернуть его, если он уехал вниз при прокрутке списка). */
     private void openMini() {
-        if (miniPlayer.getVisibility() != View.VISIBLE) {
-            miniPlayer.setVisibility(View.VISIBLE);
-            miniPlayer.animate().translationY(0).setDuration(300).start();
-        }
+        miniPlayer.setVisibility(View.VISIBLE);
+        if (miniPlayer.getTranslationY() != 0f) miniPlayer.animate().translationY(0).setDuration(300).start();
     }
 
     private void openNowPlaying(boolean open) {
@@ -1204,6 +1220,7 @@ public class MainActivity extends AppCompatActivity {
             setupProfileContent();
         } else if (s == 4) {
             h1.setText("Настройки");
+            headerBox.setVisibility(View.GONE);   // заголовок уже есть в строке со стрелкой «Назад»
             settingsContainer.setVisibility(View.VISIBLE);
             setupSettingsContent();
         } else if (s == 5) {
@@ -1211,6 +1228,8 @@ public class MainActivity extends AppCompatActivity {
             recycler.setVisibility(View.VISIBLE);
         }
         fillContent();
+        // мини-плеер мог уехать вниз при прокрутке прошлого списка — на новом экране он снова виден
+        if (engine.isStarted()) openMini();
     }
 
     /** Список и блок над ним для текущего экрана (без сброса шапки и прокрутки). */
@@ -1340,10 +1359,16 @@ public class MainActivity extends AppCompatActivity {
         searchClear.setBackground(ListViews.ripple(light, false));
 
         bottomNav.setBackgroundColor(cBase);
+        int[] navItems = {R.id.navHome, R.id.navSearch, R.id.navLibrary, R.id.navProfile};
+        for (int id : navItems) findViewById(id).setBackground(ListViews.ripple(light, false));
         updateNavTints();
+        // фон окна (виден при переходах между экранами) — как у темы, а не всегда тёмный
+        getWindow().setBackgroundDrawable(new ColorDrawable(cBase));
 
         if (settingsTitleLabel != null) settingsTitleLabel.setTextColor(cText);
         if (btnSettingsBack instanceof ImageView) ((ImageView) btnSettingsBack).setColorFilter(iconColor);
+        btnSettingsBack.setBackground(ListViews.ripple(light, false));
+        miniLike.setBackground(ListViews.ripple(light, false));
 
         GradientDrawable mb = new GradientDrawable();
         mb.setColor(cSurface);
@@ -1393,6 +1418,11 @@ public class MainActivity extends AppCompatActivity {
         tintIf(R.id.createIcon, iconColor); tintIf(R.id.uploadIcon, iconColor); tintIf(R.id.settingsIcon, iconColor);
         tintIf(R.id.sponsorIcon, iconColor);
         tintIf(R.id.btnEditName, iconColor);
+        // отклик на нажатие в цветах темы
+        View edit = findViewById(R.id.btnEditName);
+        if (edit != null) edit.setBackground(ListViews.ripple(light, false));
+        View av = findViewById(R.id.profileAvatarContainer);
+        if (av instanceof FrameLayout) ((FrameLayout) av).setForeground(ListViews.ripple(light, false));
     }
 
     private void setTextColorIf(int id, int color) {
@@ -1412,6 +1442,7 @@ public class MainActivity extends AppCompatActivity {
             g.setColor(cSurface);
             g.setCornerRadius(dp(16));
             v.setBackground(g);
+            v.setForeground(ListViews.rippleRounded(!light, dp(16)));   // все эти карточки нажимаются
         }
     }
 
@@ -1423,8 +1454,6 @@ public class MainActivity extends AppCompatActivity {
         if (h < 18) return "Добрый день";
         return "Добрый вечер";
     }
-
-    static String tracksWord(int n) { return Texts.plural(n, "трек", "трека", "треков"); }
 
     void toast(String s) {
         android.widget.Toast.makeText(this, s, android.widget.Toast.LENGTH_SHORT).show();

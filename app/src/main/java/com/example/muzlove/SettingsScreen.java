@@ -31,12 +31,15 @@ final class SettingsScreen {
         list.removeAllViews();
         list.addView(a.settingRow("Тёмная тема", dark ? "Вкл" : "Выкл", a::toggleTheme));
         list.addView(a.settingRow("Звуковая волна", a.isWaveform() ? "Вкл" : "Выкл", a::toggleWaveform));
-        list.addView(a.settingRow("Уведомление плеера", notificationsOn() ? "Включено" : "Выключено", this::onNotificationsTap));
+        list.addView(a.settingRow("Уведомление плеера", notificationsOn() ? "Вкл" : "Выкл", this::onNotificationsTap));
         list.addView(a.settingRow("Эквалайзер", engine.equalizer().isEnabled() ? "Вкл" : "Выкл",
                 () -> sheets.showEqualizer(!a.isLightTheme())));
         list.addView(a.settingRow("Таймер сна", sheets.sleepState(), () -> sheets.showSleepTimer(!a.isLightTheme())));
         list.addView(a.settingRow("Изменить профиль", st.getName(), a.profileSheets()::showEditProfile));
-        list.addView(a.settingRow("Очистить историю поиска", String.valueOf(st.getSearchHistory().size()), this::clearSearchHistory));
+        int queries = st.getSearchHistory().size();
+        list.addView(a.settingRow("Очистить историю поиска",
+                queries > 0 ? queries + " " + Texts.plural(queries, "запрос", "запроса", "запросов") : "Пусто",
+                this::clearSearchHistory));
         list.addView(a.settingRow("Сбросить приложение", "", this::confirmReset));
         list.addView(a.settingRow("О приложении", ProfileSheets.versionName(a), a.profileSheets()::showAbout));
     }
@@ -93,7 +96,7 @@ final class SettingsScreen {
             a.toast("История поиска очищена");
             a.refreshSettings();
         };
-        if (st.getSearchHistory().isEmpty()) { clear.run(); return; }
+        if (st.getSearchHistory().isEmpty()) { a.toast("История поиска пуста"); return; }
         a.dialogs().confirm(!a.isLightTheme(), "Очистить историю поиска?",
                 "Недавние запросы будут удалены.", "Очистить", clear);
     }

@@ -45,10 +45,7 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.VH> {
         notifyDataSetChanged();
     }
 
-    /** Копия показанного списка (для очереди воспроизведения). */
-    public List<Track> getItems() { return new ArrayList<>(items); }
-
-    /** id показанных треков по порядку. */
+    /** id показанных треков по порядку (очередь воспроизведения). */
     public List<Integer> ids() {
         List<Integer> out = new ArrayList<>(items.size());
         for (Track t : items) out.add(t.id);
@@ -77,17 +74,19 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.VH> {
         h.cover.setBackground(cover);
 
         int textPrimary = light ? 0xFF15131F : 0xFFF3F1FA;
-        int textMuted = light ? 0xFF6B6880 : 0xFFA09CB8;
+        int textMuted = light ? 0xFF5D5A72 : 0xFFA09CB8;
+        // цвет обложки как акцент; на белом фоне светлые цвета затемняются, чтобы читались
+        int accent = light ? ListViews.readableOnWhite(t.c1) : t.c1;
 
         h.title.setText(t.title);
-        h.title.setTextColor(active ? t.c1 : textPrimary);
+        h.title.setTextColor(active ? accent : textPrimary);
         h.artist.setText(t.artist);
         h.artist.setTextColor(textMuted);
 
         h.liked.setVisibility(isLiked ? View.VISIBLE : View.GONE);
-        h.liked.setColorFilter(t.c1);
+        h.liked.setColorFilter(accent);
         h.eq.setVisibility(active ? View.VISIBLE : View.GONE);
-        h.eq.setColorFilter(t.c1);
+        h.eq.setColorFilter(accent);
         h.add.setColorFilter(textMuted);
         h.more.setColorFilter(textMuted);
 
