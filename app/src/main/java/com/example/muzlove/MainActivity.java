@@ -1,5 +1,8 @@
 package com.example.muzlove;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ValueAnimator;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioAttributes;
@@ -17,6 +20,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.SeekBar;
 import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -72,7 +76,12 @@ public class MainActivity extends AppCompatActivity {
     // вью
     private View root;
     private TextView eyebrow, h1;
-    private LinearLayout searchBox, playlistsRow;
+    private LinearLayout searchBox, playlistsRow, headerBox;
+    private View searchHistoryBox;
+    private LinearLayout searchHistoryList;
+    private boolean headerCollapsed = false;
+    private int headerFullHeight = 0;
+    private ValueAnimator headerAnim;
     private View playlistsScroll;
     private EditText searchInput;
     private RecyclerView recycler;
@@ -83,11 +92,13 @@ public class MainActivity extends AppCompatActivity {
     private TextView miniTitle, miniArtist;
     private ImageView miniLike, miniPlayIcon;
     private View npOverlay, npCover, playBtn;
+    private SeekBar slider;
+    private ImageView btnShare, btnMore, btnQueue;
     private TextView npAlbum, npTitle, npArtist, timeCur, timeDur;
     private ImageView npLike, btnShuffle, btnRepeat, playIcon, navHomeIc, navSearchIc, navLibIc, navProfileIc;
     private TextView navHomeTx, navSearchTx, navLibTx, navProfileTx;
     private LinearLayout profileContainer, settingsContainer, settingsList;
-    private View btnSettings, btnSettingsBack;
+    private View btnSettingsBack;
     private TextView settingsTitleLabel;
     private WaveformView wave;
 
@@ -162,6 +173,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void bind() {
         root = findViewById(R.id.root);
+        headerBox = findViewById(R.id.headerBox);
         eyebrow = findViewById(R.id.eyebrow);
         h1 = findViewById(R.id.h1);
         searchBox = findViewById(R.id.searchBox);
@@ -169,6 +181,8 @@ public class MainActivity extends AppCompatActivity {
         playlistsScroll = findViewById(R.id.playlistsScroll);
         playlistsRow = findViewById(R.id.playlistsRow);
         recycler = findViewById(R.id.recycler);
+        searchHistoryBox = findViewById(R.id.searchHistoryBox);
+        searchHistoryList = findViewById(R.id.searchHistoryList);
 
         miniPlayer = findViewById(R.id.miniPlayer);
         miniCover = findViewById(R.id.miniCover);
@@ -191,7 +205,6 @@ public class MainActivity extends AppCompatActivity {
         profileContainer = findViewById(R.id.profileContainer);
         settingsContainer = findViewById(R.id.settingsContainer);
         settingsList = findViewById(R.id.settingsList);
-        btnSettings = findViewById(R.id.btnSettings);
         btnSettingsBack = findViewById(R.id.btnSettingsBack);
         settingsTitleLabel = findViewById(R.id.settingsTitleLabel);
 
@@ -211,11 +224,27 @@ public class MainActivity extends AppCompatActivity {
         playIcon = findViewById(R.id.playIcon);
         btnShuffle = findViewById(R.id.btnShuffle);
         btnRepeat = findViewById(R.id.btnRepeat);
-
-        GradientDrawable circle = new GradientDrawable();
-        circle.setShape(GradientDrawable.OVAL);
-        circle.setColor(Color.WHITE);
-        playBtn.setBackground(circle);
+        btnShare = findViewById(R.id.btnShare);
+        btnMore = findViewById(R.id.btnMore);
+        btnQueue = findViewById(R.id.btnQueue);
+        slider = findViewById(R.id.slider);
+        slider.setMax(1000);
+        slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser && durationMs > 0) {
+                    timeMs = (int) ((progress / 1000f) * durationMs);
+                    updateTimeLabels();
+                }
+            }
+            @Override public void onStartTrackingTouch(SeekBar seekBar) {}
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                if (durationMs > 0) {
+                    mp.seekTo(timeMs);
+                }
+            }
+        });
     }
 
     private void setupPlayer() {
@@ -235,9 +264,94 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupRecycler() {
-        adapter = new TrackAdapter(liked, this::playById);
+        adapter = new TrackAdapter(liked, t -> {
+            // если играем трек из результатов поиска — запоминаем запрос в истории
+            if (screen == 1) {
+                String q = searchInput.getText().toString().trim();
+                if (!q.isEmpty()) storage.addSearchHistory(q);
+            }
+            playById(t);
+        });
         recycler.setLayoutManager(new LinearLayoutManager(this));
         recycler.setAdapter(adapter);
+
+        recycler.addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView recyclerView, int dx, int dy) {
+                // Прячем/показываем мини-плеер
+                if (started && miniPlayer.getVisibility() == View.VISIBLE) {
+                    if (dy > 20) {
+                        miniPlayer.animate().translationY(dp(100)).setDuration(300).start();
+                    } else if (dy < -20) {
+                        miniPlayer.animate().translationY(0).setDuration(300).start();
+                    }
+                }
+
+                // Плавно сворачиваем/разворачиваем ТОЛЬКО заголовок (плейлисты оставляем,
+                // иначе список становится коротким и шапку не вернуть прокруткой вверх).
+                if (screen == 0) {
+                    boolean atTop = recyclerView.computeVerticalScrollOffset() <= 6;
+                    if (atTop || dy < -15) {
+                        animateHeader(false);   // показать
+                    } else if (dy > 15) {
+                        animateHeader(true);    // спрятать
+                    }
+                }
+            }
+        });
+    }
+
+    /** Плавно сворачивает (collapse=true) или разворачивает заголовок по высоте + прозрачности. */
+    private void animateHeader(boolean collapse) {
+        if (collapse == headerCollapsed) return;
+        headerCollapsed = collapse;
+
+        if (headerFullHeight <= 0) headerFullHeight = headerBox.getHeight();
+        if (headerFullHeight <= 0) {            // ещё не измерен — без анимации
+            headerBox.setVisibility(collapse ? View.GONE : View.VISIBLE);
+            return;
+        }
+
+        if (headerAnim != null) headerAnim.cancel();
+        headerBox.setVisibility(View.VISIBLE);
+
+        int from = headerBox.getHeight();
+        int to = collapse ? 0 : headerFullHeight;
+
+        headerAnim = ValueAnimator.ofInt(from, to);
+        headerAnim.setDuration(230);
+        headerAnim.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        headerAnim.addUpdateListener(a -> {
+            int h = (int) a.getAnimatedValue();
+            ViewGroup.LayoutParams lp = headerBox.getLayoutParams();
+            lp.height = h;
+            headerBox.setLayoutParams(lp);
+            headerBox.setAlpha((float) h / headerFullHeight);
+        });
+        headerAnim.addListener(new AnimatorListenerAdapter() {
+            @Override public void onAnimationEnd(Animator a) {
+                if (headerCollapsed) {
+                    headerBox.setVisibility(View.GONE);
+                } else {
+                    ViewGroup.LayoutParams lp = headerBox.getLayoutParams();
+                    lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+                    headerBox.setLayoutParams(lp);
+                    headerBox.setAlpha(1f);
+                }
+            }
+        });
+        headerAnim.start();
+    }
+
+    /** Сброс заголовка в видимое состояние (при переходе на любой экран). */
+    private void resetHeaderState() {
+        if (headerAnim != null) headerAnim.cancel();
+        headerCollapsed = false;
+        ViewGroup.LayoutParams lp = headerBox.getLayoutParams();
+        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+        headerBox.setLayoutParams(lp);
+        headerBox.setAlpha(1f);
+        headerBox.setVisibility(View.VISIBLE);
     }
 
     private void setupNav() {
@@ -245,13 +359,18 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.navSearch).setOnClickListener(v -> showScreen(1));
         findViewById(R.id.navLibrary).setOnClickListener(v -> showScreen(2));
         findViewById(R.id.navProfile).setOnClickListener(v -> showScreen(3));
-        btnSettings.setOnClickListener(v -> showScreen(4));
         btnSettingsBack.setOnClickListener(v -> showScreen(3)); // Назад в профиль
 
         searchInput.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a, int b, int d) {}
             public void onTextChanged(CharSequence c, int a, int b, int d) { applySearch(c.toString()); }
             public void afterTextChanged(Editable e) {}
+        });
+
+        searchInput.setOnEditorActionListener((tv, actionId, e) -> {
+            String q = searchInput.getText().toString().trim();
+            if (!q.isEmpty()) storage.addSearchHistory(q);
+            return false;
         });
 
         miniPlayer.setOnClickListener(v -> openNowPlaying(true));
@@ -262,17 +381,23 @@ public class MainActivity extends AppCompatActivity {
     private void setupNowPlaying() {
         npOverlay.setVisibility(View.VISIBLE);
         npOverlay.setTranslationY(getResources().getDisplayMetrics().heightPixels);
-        
+
         // Делаем фон непрозрачным для кликов, чтобы они не пролетали на задний план
         npOverlay.setClickable(true);
         npOverlay.setFocusable(true);
 
-        findViewById(R.id.npClose).setOnClickListener(v -> openNowPlaying(false));
+        findViewById(R.id.npClose).setOnClickListener(v -> {
+            openNowPlaying(false);
+            showScreen(0); // При закрытии плеера перекидываем на главную
+        });
         playBtn.setOnClickListener(v -> togglePlay());
         findViewById(R.id.btnNext).setOnClickListener(v -> next());
         findViewById(R.id.btnPrev).setOnClickListener(v -> prev());
         btnShuffle.setOnClickListener(v -> toggleShuffle());
         btnRepeat.setOnClickListener(v -> cycleRepeat());
+        btnShare.setOnClickListener(v -> showShareSheet());
+        btnMore.setOnClickListener(v -> showMoreSheet());
+        btnQueue.setOnClickListener(v -> { openNowPlaying(false); showScreen(2); });
         npLike.setOnClickListener(v -> toggleLike(current().id));
         wave.setOnSeek(ratio -> seekTo((int) (ratio * durationMs)));
     }
@@ -289,6 +414,11 @@ public class MainActivity extends AppCompatActivity {
             GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{p.c1, p.c2});
             g.setCornerRadius(dp(16));
             art.setBackground(g);
+            // отдельная иконка плейлистов (вместо обычной нотки)
+            if (art instanceof ViewGroup) {
+                View ico = ((ViewGroup) art).getChildAt(0);
+                if (ico instanceof ImageView) ((ImageView) ico).setImageResource(R.drawable.ic_playlist);
+            }
             TextView nm = card.findViewById(R.id.plName); nm.setText(p.name); nm.setTextColor(cText);
             TextView ds = card.findViewById(R.id.plDesc); ds.setText(p.desc); ds.setTextColor(cMuted);
             final Playlist fp = p;
@@ -324,7 +454,7 @@ public class MainActivity extends AppCompatActivity {
             avatarIv.setVisibility(View.VISIBLE);
             avatarTxt.setVisibility(View.GONE);
             avatarIv.setImageURI(Uri.parse(avUri));
-            
+
             // Скругление для ImageView
             GradientDrawable shape = new GradientDrawable();
             shape.setShape(GradientDrawable.OVAL);
@@ -352,11 +482,17 @@ public class MainActivity extends AppCompatActivity {
         if (playlistCount != null)
             playlistCount.setText(String.valueOf(Data.PLAYLISTS.size() + customPlaylists.size()));
 
+        View stat1 = findViewById(R.id.statCard1);
+        if (stat1 != null) stat1.setOnClickListener(v -> showScreen(2)); // К Любимым (Медиатека)
+
+        View stat2 = findViewById(R.id.statCard2);
+        if (stat2 != null) stat2.setOnClickListener(v -> showScreen(0)); // К плейлистам (Главная)
+
         findViewById(R.id.btnCreatePlaylist).setOnClickListener(v -> createPlaylistDialog());
         findViewById(R.id.btnUploadMusic).setOnClickListener(v -> pickMusicFile());
         findViewById(R.id.btnSettingsInProfile).setOnClickListener(v -> showScreen(4));
         findViewById(R.id.btnSponsorship).setOnClickListener(v -> toast("Временно недоступно"));
-        
+
         View avContainer = findViewById(R.id.profileAvatarContainer);
         if (avContainer != null) avContainer.setOnClickListener(v -> avatarPicker.launch("image/*"));
 
@@ -367,40 +503,122 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void applySearch(String q) {
-        q = q.trim().toLowerCase(Locale.ROOT);
-        if (q.isEmpty()) {
+        String qq = q.trim().toLowerCase(Locale.ROOT);
+        if (qq.isEmpty()) {
             h1.setText("Поиск");
             adapter.setData(new ArrayList<>());
+            showSearchHistory(true);     // показать недавние запросы
             return;
         }
+        showSearchHistory(false);        // спрятать историю, показать результаты
         h1.setText("Результаты");
         List<Track> res = new ArrayList<>();
         for (Track t : allTracks) {
             String hay = (t.title + " " + t.artist + " " + t.album).toLowerCase(Locale.ROOT);
-            if (hay.contains(q)) res.add(t);
+            if (hay.contains(qq)) res.add(t);
         }
         adapter.setData(res);
         if (started) adapter.setCurrent(current().id);
     }
 
+    private void showSearchHistory(boolean show) {
+        if (searchHistoryBox == null) return;
+        if (screen != 1) {               // история только на экране поиска
+            searchHistoryBox.setVisibility(View.GONE);
+            return;
+        }
+        if (show) {
+            buildSearchHistory();
+            searchHistoryBox.setVisibility(View.VISIBLE);
+            recycler.setVisibility(View.GONE);
+        } else {
+            searchHistoryBox.setVisibility(View.GONE);
+            recycler.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void buildSearchHistory() {
+        searchHistoryList.removeAllViews();
+        List<String> hist = storage.getSearchHistory();
+
+        // строка-заголовок: "Недавнее" + "Очистить"
+        LinearLayout head = new LinearLayout(this);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.setPadding(0, (int) dp(6), 0, (int) dp(6));
+
+        TextView lbl = new TextView(this);
+        lbl.setText(hist.isEmpty() ? "Нет недавних запросов" : "Недавнее");
+        lbl.setTextColor(cMuted);
+        lbl.setTextSize(13);
+        lbl.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        head.addView(lbl);
+
+        if (!hist.isEmpty()) {
+            TextView clear = new TextView(this);
+            clear.setText("Очистить");
+            clear.setTextColor(cText);
+            clear.setTextSize(13);
+            clear.setPadding((int) dp(10), (int) dp(4), (int) dp(4), (int) dp(4));
+            clear.setClickable(true);
+            clear.setFocusable(true);
+            clear.setOnClickListener(v -> { storage.clearSearchHistory(); buildSearchHistory(); });
+            head.addView(clear);
+        }
+        searchHistoryList.addView(head);
+
+        for (String term : hist) {
+            final String t = term;
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            int pad = (int) dp(12);
+            row.setPadding(0, pad, 0, pad);
+            row.setClickable(true);
+            row.setFocusable(true);
+
+            ImageView ic = new ImageView(this);
+            ic.setImageResource(R.drawable.ic_history);
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams((int) dp(18), (int) dp(18));
+            ilp.rightMargin = (int) dp(14);
+            ic.setLayoutParams(ilp);
+            ic.setColorFilter(cMuted);
+
+            TextView tv = new TextView(this);
+            tv.setText(t);
+            tv.setTextColor(cText);
+            tv.setTextSize(15);
+            tv.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+            ImageView go = new ImageView(this);
+            go.setImageResource(R.drawable.ic_search);
+            go.setLayoutParams(new LinearLayout.LayoutParams((int) dp(16), (int) dp(16)));
+            go.setColorFilter(cMuted);
+
+            row.addView(ic);
+            row.addView(tv);
+            row.addView(go);
+            row.setOnClickListener(v -> {
+                searchInput.setText(t);
+                searchInput.setSelection(t.length());   // applySearch сработает через TextWatcher
+            });
+            searchHistoryList.addView(row);
+        }
+    }
+
     // ---------- настройки ----------
     private void setupSettingsContent() {
         settingsList.removeAllViews();
-        settingsList.addView(settingRow("Светлая тема", light ? "Вкл" : "Выкл", () -> {
+        settingsList.addView(settingRow("Тёмная тема", !light ? "Вкл" : "Выкл", () -> {
             light = !light; storage.setLight(light); applyTheme(); setupSettingsContent();
         }));
         settingsList.addView(settingRow("Звуковая волна", waveform ? "Вкл" : "Выкл", () -> {
             waveform = !waveform; storage.setWaveform(waveform); wave.setSimpleMode(!waveform); setupSettingsContent();
         }));
         settingsList.addView(settingRow("Изменить имя", storage.getName(), this::editNameDialog));
-        settingsList.addView(settingRow("Очистить лайки", String.valueOf(liked.size()), () -> {
-            liked.clear(); storage.saveLikes(liked); adapter.refreshLikes();
-            if (screen == 2) showScreen(2);
-            setupSettingsContent();
-        }));
-        settingsList.addView(settingRow("О приложении", "Resonance 1.4", () ->
+        settingsList.addView(settingRow("О приложении", "Resonance 1.7", () ->
                 new AlertDialog.Builder(this).setTitle("Resonance")
-                        .setMessage("Музыкальный плеер.\nВерсия 1.4\n(Добавлен островок и доработка тем)").setPositiveButton("OK", null).show()));
+                        .setMessage("Музыкальный плеер.\nВерсия 1.7\n(Автоскрытие шапки и настроек)").setPositiveButton("OK", null).show()));
     }
 
     private View settingRow(String title, String value, Runnable onClick) {
@@ -541,7 +759,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateNavTints() {
-        int on = light ? Color.BLACK : cText; 
+        int on = light ? Color.BLACK : cText;
         int off = light ? 0x60000000 : 0xFF7B7796;
         navHomeIc.setColorFilter(screen == 0 ? on : off);
         navSearchIc.setColorFilter(screen == 1 ? on : off);
@@ -605,10 +823,10 @@ public class MainActivity extends AppCompatActivity {
         Track t = current();
         prepared = false; fallback = false;
         timeMs = 0; durationMs = Math.max(1000, t.dur * 1000);
-        
+
         // Если была пауза, то при переключении трекаautoplay (автозапуск) не должен срабатывать,
         // кроме случая явного вызова playById (там autoplay всегда true)
-        if (!autoplay) playing = false; 
+        if (!autoplay) playing = false;
 
         try {
             mp.reset();
@@ -742,6 +960,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateProgress() {
         float ratio = durationMs > 0 ? (float) timeMs / durationMs : 0;
         wave.setProgress(ratio);
+        if (slider != null) slider.setProgress((int) (ratio * 1000));
         timeCur.setText(fmt(timeMs / 1000));
         ViewGroup.LayoutParams lp = miniProgress.getLayoutParams();
         int full = miniPlayer.getWidth();
@@ -780,16 +999,17 @@ public class MainActivity extends AppCompatActivity {
         wave.setColors(t.c1, 0x29FFFFFF);
 
         boolean isLiked = liked.contains(t.id);
-        npLike.setColorFilter(isLiked ? t.c1 : Color.WHITE);
-        miniLike.setColorFilter(isLiked ? t.c1 : (light ? Color.BLACK : Color.parseColor("#C9C5DE")));
-        btnShuffle.setColorFilter(shuffle ? t.c1 : Color.parseColor("#C9C5DE"));
-        btnRepeat.setColorFilter(repeat != 0 ? t.c1 : Color.parseColor("#C9C5DE"));
+        int accent = Color.parseColor("#F4FE52");
+        npLike.setColorFilter(isLiked ? accent : Color.WHITE);
+        miniLike.setColorFilter(isLiked ? accent : (light ? Color.BLACK : Color.parseColor("#C9C5DE")));
+        btnShuffle.setColorFilter(shuffle ? accent : Color.parseColor("#B3FFFFFF"));
+        btnRepeat.setColorFilter(repeat != 0 ? accent : Color.parseColor("#B3FFFFFF"));
 
         updateTimeLabels();
 
-        // Сделали фон непрозрачным (Color.parseColor("#0A0913") в конце), чтобы не просвечивал задний план
+        // Приятный темный градиент для фона плеера
         GradientDrawable npBg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{blend(t.c1, 0xFF), blend(t.c2, 0xFF), Color.parseColor("#0A0913")});
+                new int[]{0xFF1A1826, 0xFF121019, 0xFF0D0C14});
         npOverlay.setBackground(npBg);
     }
 
@@ -802,6 +1022,83 @@ public class MainActivity extends AppCompatActivity {
         GradientDrawable bg = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[]{blend(t.c1, a1), blend(t.c2, a2), cBase});
         root.setBackground(bg);
+    }
+
+    private void showShareSheet() {
+        com.google.android.material.bottomsheet.BottomSheetDialog d = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding((int)dp(20), (int)dp(20), (int)dp(20), (int)dp(30));
+        root.setBackgroundColor(Color.parseColor("#161422"));
+
+        TextView t = new TextView(this);
+        t.setText("Поделиться треком"); t.setTextColor(Color.WHITE);
+        t.setTextSize(20); t.setGravity(Gravity.CENTER);
+        t.setPadding(0, 0, 0, (int)dp(20));
+        root.addView(t);
+
+        String[] opts = {"Facebook", "Ссылка", "Еще"};
+        int[] ics = {R.drawable.ic_profile, R.drawable.ic_search, R.drawable.ic_more};
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER);
+        for(int i=0; i<opts.length; i++) {
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setGravity(Gravity.CENTER);
+            col.setPadding((int)dp(15), 0, (int)dp(15), 0);
+            ImageView iv = new ImageView(this);
+            iv.setImageResource(ics[i]); iv.setColorFilter(Color.WHITE);
+            iv.setBackgroundResource(R.drawable.circle_overlay);
+            iv.getBackground().setTint(Color.parseColor("#33FFFFFF"));
+            iv.setPadding((int)dp(12), (int)dp(12), (int)dp(12), (int)dp(12));
+            col.addView(iv, new LinearLayout.LayoutParams((int)dp(50), (int)dp(50)));
+            TextView tv = new TextView(this); tv.setText(opts[i]); tv.setTextColor(Color.WHITE);
+            tv.setTextSize(12); tv.setPadding(0, (int)dp(8), 0, 0);
+            col.addView(tv);
+            row.addView(col);
+        }
+        root.addView(row);
+        d.setContentView(root); d.show();
+    }
+
+    private void showMoreSheet() {
+        com.google.android.material.bottomsheet.BottomSheetDialog d = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(Color.parseColor("#161422"));
+        root.setPadding(0, (int)dp(10), 0, (int)dp(20));
+
+        Track t = current();
+        LinearLayout header = new LinearLayout(this);
+        header.setPadding((int)dp(20), (int)dp(10), (int)dp(20), (int)dp(20));
+        ImageView iv = new ImageView(this);
+        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{t.c1, t.c2});
+        g.setCornerRadius(dp(8)); iv.setBackground(g);
+        header.addView(iv, new LinearLayout.LayoutParams((int)dp(50), (int)dp(50)));
+        LinearLayout info = new LinearLayout(this);
+        info.setOrientation(LinearLayout.VERTICAL); info.setPadding((int)dp(15), 0, 0, 0);
+        TextView title = new TextView(this); title.setText(t.title); title.setTextColor(Color.WHITE); title.setTextSize(16);
+        TextView art = new TextView(this); art.setText(t.artist); art.setTextColor(Color.LTGRAY); art.setTextSize(14);
+        info.addView(title); info.addView(art);
+        header.addView(info);
+        root.addView(header);
+
+        String[] items = {"Поделиться", "Добавить в плейлист", "Слушать на устройстве", "Удалить из очереди", "О треке"};
+        int[] ics = {R.drawable.ic_upload, R.drawable.ic_plus, R.drawable.ic_notes, R.drawable.ic_trash, R.drawable.ic_notes};
+        for(int i=0; i<items.length; i++) {
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding((int)dp(20), (int)dp(12), (int)dp(20), (int)dp(12));
+            ImageView icon = new ImageView(this); icon.setImageResource(ics[i]); icon.setColorFilter(Color.WHITE);
+            row.addView(icon, new LinearLayout.LayoutParams((int)dp(24), (int)dp(24)));
+            TextView txt = new TextView(this); txt.setText(items[i]); txt.setTextColor(Color.WHITE);
+            txt.setTextSize(15); txt.setPadding((int)dp(15), 0, 0, 0);
+            row.addView(txt);
+            final int idx = i;
+            row.setOnClickListener(v -> { d.dismiss(); if(idx==0) showShareSheet(); });
+            root.addView(row);
+        }
+        d.setContentView(root); d.show();
     }
 
     private void openMini() {
@@ -819,16 +1116,13 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (npOpen) { openNowPlaying(false); return; }
-        if (!screenHistory.isEmpty()) {
-            int lastScreen = screenHistory.remove(screenHistory.size() - 1);
-            // Предотвращаем бесконечные переходы между двумя экранами, если нужно
-            screen = lastScreen;
-            updateNavTints();
-            
-            // Здесь логика скрытия/показа контейнеров аналогично showScreen, 
-            // но без добавления в историю
-            applyScreenVisibility(screen);
+        if (npOpen) {
+            openNowPlaying(false);
+            showScreen(0);
+            return;
+        }
+        if (screen != 0) {
+            showScreen(0);
             return;
         }
         super.onBackPressed();
@@ -841,7 +1135,8 @@ public class MainActivity extends AppCompatActivity {
         playlistsScroll.setVisibility(View.GONE);
         searchBox.setVisibility(View.GONE);
         eyebrow.setVisibility(View.GONE);
-        btnSettings.setVisibility(View.GONE);
+        searchHistoryBox.setVisibility(View.GONE);
+        resetHeaderState(); // шапка всегда видна и развёрнута при открытии экрана
 
         if (s == 0) {
             eyebrow.setVisibility(View.VISIBLE);
@@ -849,7 +1144,6 @@ public class MainActivity extends AppCompatActivity {
             h1.setText("Что послушаем?");
             playlistsScroll.setVisibility(View.VISIBLE);
             recycler.setVisibility(View.VISIBLE);
-            btnSettings.setVisibility(View.VISIBLE);
             adapter.setData(Data.TRACKS);
         } else if (s == 1) {
             h1.setText("Поиск");
@@ -915,7 +1209,6 @@ public class MainActivity extends AppCompatActivity {
         h1.setTextColor(cText);
         eyebrow.setTextColor(cMuted);
         int iconColor = light ? Color.BLACK : cText;
-        if (btnSettings instanceof ImageView) ((ImageView) btnSettings).setColorFilter(iconColor);
 
         GradientDrawable sb = new GradientDrawable();
         sb.setColor(light ? 0x14000000 : 0x17FFFFFF);

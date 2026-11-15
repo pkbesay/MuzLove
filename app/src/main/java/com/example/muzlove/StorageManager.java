@@ -21,6 +21,7 @@ public class StorageManager {
     private static final String KEY_LIKES = "liked_ids";
     private static final String KEY_REGISTERED = "is_registered";
     private static final String KEY_AVATAR = "profile_avatar";
+    private static final String KEY_SEARCH_HISTORY = "search_history";
 
     private final SharedPreferences prefs;
     private final Gson gson;
@@ -97,4 +98,31 @@ public class StorageManager {
     // ---- аватар ----
     public String getAvatarUri() { return prefs.getString(KEY_AVATAR, null); }
     public void setAvatarUri(String uri) { prefs.edit().putString(KEY_AVATAR, uri).apply(); }
+
+    // ---- история поиска ----
+    public List<String> getSearchHistory() {
+        String json = prefs.getString(KEY_SEARCH_HISTORY, null);
+        if (json == null) return new ArrayList<>();
+        Type type = new TypeToken<ArrayList<String>>() {}.getType();
+        List<String> list = gson.fromJson(json, type);
+        return list != null ? list : new ArrayList<>();
+    }
+
+    public void addSearchHistory(String q) {
+        if (q == null) return;
+        q = q.trim();
+        if (q.isEmpty()) return;
+        List<String> list = getSearchHistory();
+        // убрать дубликат (без учёта регистра) и поставить запрос первым
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i).equalsIgnoreCase(q)) list.remove(i);
+        }
+        list.add(0, q);
+        while (list.size() > 12) list.remove(list.size() - 1);
+        prefs.edit().putString(KEY_SEARCH_HISTORY, gson.toJson(list)).apply();
+    }
+
+    public void clearSearchHistory() {
+        prefs.edit().remove(KEY_SEARCH_HISTORY).apply();
+    }
 }

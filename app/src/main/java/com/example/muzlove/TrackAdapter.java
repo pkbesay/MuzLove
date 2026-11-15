@@ -61,16 +61,9 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.VH> {
 
         h.title.setText(t.title);
         h.title.setTextColor(active ? t.c1 : textPrimary);
-        h.artist.setText(t.artist + " · " + t.album);
+        h.artist.setText(t.artist);
         h.artist.setTextColor(textMuted);
 
-        boolean isLiked = liked.contains(t.id);
-        h.heart.setVisibility(isLiked ? View.VISIBLE : View.GONE);
-        h.heart.setColorFilter(t.c1);
-
-        h.dur.setText(fmt(t.dur));
-        h.dur.setTextColor(textMuted);
-        h.dur.setVisibility(active ? View.GONE : View.VISIBLE);
         h.eq.setVisibility(active ? View.VISIBLE : View.GONE);
         h.eq.setColorFilter(t.c1);
 
@@ -82,14 +75,12 @@ public class TrackAdapter extends RecyclerView.Adapter<TrackAdapter.VH> {
     @Override public int getItemCount() { return items.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        View cover; TextView title, artist, dur; ImageView heart, eq;
+        View cover; TextView title, artist; ImageView eq;
         VH(View v) {
             super(v);
             cover = v.findViewById(R.id.cover);
             title = v.findViewById(R.id.rowTitle);
             artist = v.findViewById(R.id.rowArtist);
-            dur = v.findViewById(R.id.rowDur);
-            heart = v.findViewById(R.id.rowHeart);
             eq = v.findViewById(R.id.rowEq);
         }
     }

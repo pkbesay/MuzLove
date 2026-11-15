@@ -5,55 +5,55 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#0A0913"
+    android:background="#121019"
     android:paddingStart="24dp"
     android:paddingEnd="24dp"
     android:paddingTop="20dp"
     android:paddingBottom="34dp"
     android:visibility="gone">
 
-    <LinearLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:layout_marginBottom="32dp">
         <ImageView android:id="@+id/npClose"
-            android:layout_width="40dp" android:layout_height="40dp" android:padding="6dp"
-            android:src="@drawable/ic_chevron_down" app:tint="#FFFFFF" />
-        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-            android:layout_weight="1" android:orientation="vertical" android:gravity="center">
-            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:text="СЕЙЧАС ИГРАЕТ" android:textColor="#B3FFFFFF" android:textSize="11sp"
-                android:textStyle="bold" android:letterSpacing="0.1" />
-            <TextView android:id="@+id/npAlbum" android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold" android:layout_marginTop="2dp" />
-        </LinearLayout>
-        <View android:layout_width="40dp" android:layout_height="40dp" />
-    </LinearLayout>
+            android:layout_width="32dp" android:layout_height="32dp"
+            android:src="@drawable/ic_chevron_down" app:tint="#FFFFFF"
+            android:layout_alignParentStart="true" android:layout_centerVertical="true" />
+        <TextView android:id="@+id/npAlbum"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"
+            android:layout_centerInParent="true" />
+        <ImageView android:id="@+id/btnQueue"
+            android:layout_width="28dp" android:layout_height="28dp"
+            android:src="@drawable/ic_playlist" app:tint="#FFFFFF"
+            android:layout_alignParentEnd="true" android:layout_centerVertical="true" />
+    </RelativeLayout>
 
     <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
-        <View android:id="@+id/npCover" android:layout_width="300dp" android:layout_height="300dp" android:layout_gravity="center" />
+        <View android:id="@+id/npCover" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:layout_margin="8dp" />
     </FrameLayout>
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="14dp">
+        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="32dp">
         <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
             <TextView android:id="@+id/npTitle" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:textColor="#FFFFFF" android:textSize="24sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+                android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
             <TextView android:id="@+id/npArtist" android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:textColor="#BFFFFFFF" android:textSize="15sp" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" />
+                android:textColor="#BFFFFFFF" android:textSize="16sp" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>
-        <ImageView android:id="@+id/npLike" android:layout_width="40dp" android:layout_height="40dp"
-            android:padding="6dp" android:src="@drawable/ic_heart" app:tint="#FFFFFF" />
+        <ImageView android:id="@+id/btnShare" android:layout_width="40dp" android:layout_height="40dp"
+            android:padding="8dp" android:src="@drawable/ic_upload" app:tint="#FFFFFF" />
+        <ImageView android:id="@+id/btnMore" android:layout_width="40dp" android:layout_height="40dp"
+            android:padding="8dp" android:src="@drawable/ic_more" app:tint="#FFFFFF" />
     </LinearLayout>
 
-    <com.example.muzlove.WaveformView android:id="@+id/wave"
-        android:layout_width="match_parent" android:layout_height="46dp" />
-
     <SeekBar android:id="@+id/slider"
-        android:layout_width="match_parent" android:layout_height="46dp"
-        android:visibility="gone" />
-
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:thumbTint="#FFFFFF" android:progressTint="#FFFFFF"
+        android:layout_marginTop="24dp"
+        android:paddingStart="0dp" android:paddingEnd="0dp" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:layout_marginTop="6dp">
         <TextView android:id="@+id/timeCur" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -64,19 +64,34 @@
     </LinearLayout>
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="22dp">
-        <ImageView android:id="@+id/btnShuffle" android:layout_width="0dp" android:layout_height="44dp"
-            android:layout_weight="1" android:padding="10dp" android:src="@drawable/ic_shuffle" app:tint="#C9C5DE" />
+        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="32dp">
+        <ImageView android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1"
+            android:src="@drawable/ic_eq" app:tint="#FFFFFF" android:padding="4dp" />
         <ImageView android:id="@+id/btnPrev" android:layout_width="0dp" android:layout_height="44dp"
             android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_prev" app:tint="#FFFFFF" />
-        <FrameLayout android:id="@+id/btnPlay" android:layout_width="68dp" android:layout_height="68dp"
-            android:layout_marginStart="6dp" android:layout_marginEnd="6dp">
-            <ImageView android:id="@+id/playIcon" android:layout_width="30dp" android:layout_height="30dp"
-                android:layout_gravity="center" android:src="@drawable/ic_play" />
+        <FrameLayout android:id="@+id/btnPlay" android:layout_width="72dp" android:layout_height="72dp"
+            android:background="@drawable/circle_accent" android:backgroundTint="#F4FE52"
+            android:layout_marginStart="16dp" android:layout_marginEnd="16dp">
+            <ImageView android:id="@+id/playIcon" android:layout_width="32dp" android:layout_height="32dp"
+                android:layout_gravity="center" android:src="@drawable/ic_play" app:tint="#000000" />
         </FrameLayout>
         <ImageView android:id="@+id/btnNext" android:layout_width="0dp" android:layout_height="44dp"
             android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_next" app:tint="#FFFFFF" />
-        <ImageView android:id="@+id/btnRepeat" android:layout_width="0dp" android:layout_height="44dp"
-            android:layout_weight="1" android:padding="10dp" android:src="@drawable/ic_repeat" app:tint="#C9C5DE" />
+        <ImageView android:id="@+id/npLike" android:layout_width="0dp" android:layout_height="44dp"
+            android:layout_weight="1" android:padding="8dp" android:src="@drawable/ic_heart" app:tint="#FFFFFF" />
     </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center" android:layout_marginTop="40dp">
+        <ImageView android:id="@+id/btnRepeat" android:layout_width="56dp" android:layout_height="56dp"
+            android:padding="16dp" android:src="@drawable/ic_repeat" app:tint="#B3FFFFFF"
+            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF" />
+        <View android:layout_width="24dp" android:layout_height="1dp" />
+        <ImageView android:id="@+id/btnShuffle" android:layout_width="56dp" android:layout_height="56dp"
+            android:padding="16dp" android:src="@drawable/ic_shuffle" app:tint="#B3FFFFFF"
+            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF" />
+    </LinearLayout>
+
+    <com.example.muzlove.WaveformView android:id="@+id/wave"
+        android:layout_width="match_parent" android:layout_height="0dp" android:visibility="gone" />
 </LinearLayout>
