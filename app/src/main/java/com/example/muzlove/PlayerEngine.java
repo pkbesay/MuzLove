@@ -167,6 +167,17 @@ public final class PlayerEngine {
         notifyQueue();
     }
 
+    /** «Слушать» плейлист: как playFrom, но без переключения паузы. Если trackId уже текущий, очередь
+     *  становится contextIds без перезагрузки трека: он продолжает играть (или начинает, если стоял на паузе). */
+    public void playContext(List<Integer> contextIds, int trackId) {
+        if (current == null || current.id != trackId) { playFrom(contextIds, trackId); return; }
+        List<Integer> ids = contextIds != null ? new ArrayList<>(contextIds) : new ArrayList<>();
+        if (!ids.contains(trackId)) ids.add(0, trackId);
+        queue.set(ids, trackId);
+        notifyQueue();
+        if (!playing) play();
+    }
+
     public void toggle() { if (isPlaying()) pause(); else play(); }
 
     public void play() {

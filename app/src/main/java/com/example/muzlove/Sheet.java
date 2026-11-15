@@ -46,6 +46,7 @@ final class Sheet {
     final TextView title, subtitle;
 
     private final Activity activity;
+    private final LinearLayout root;
     private final List<Runnable> showActions = new ArrayList<>(), dismissActions = new ArrayList<>();
 
     static Sheet create(Activity a, boolean dark, CharSequence title) { return new Sheet(a, dark, title); }
@@ -62,7 +63,7 @@ final class Sheet {
         dialog = new BottomSheetDialog(a, dark ? R.style.Theme_MuzLove_Sheet_Dark : R.style.Theme_MuzLove_Sheet_Light);
         ctx = dialog.getContext();
 
-        LinearLayout root = new LinearLayout(ctx);
+        root = new LinearLayout(ctx);
         root.setOrientation(LinearLayout.VERTICAL);
         float r = dp(20);
         GradientDrawable g = new GradientDrawable();
@@ -258,6 +259,16 @@ final class Sheet {
         View h = trackHeader(t);
         content.addView(h, matchWrap());
         return h;
+    }
+
+    /** Закреплённая область под прокручиваемым содержимым (кнопка «Готово» и т.п.):
+     *  видна всегда, длинный список прокручивается над ней. */
+    void addFooter(View v, LinearLayout.LayoutParams lp) {
+        LinearLayout.LayoutParams slp = (LinearLayout.LayoutParams) scroll.getLayoutParams();
+        slp.weight = 1f;                     // при нехватке высоты сжимается список, а не подвал
+        scroll.setLayoutParams(slp);
+        content.setPadding(0, dp(8), 0, dp(8));
+        root.addView(v, lp);
     }
 
     /** Поясняющий текст вторичным цветом. */

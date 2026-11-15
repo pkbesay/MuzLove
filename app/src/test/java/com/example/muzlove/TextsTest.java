@@ -21,6 +21,16 @@ public class TextsTest {
         assertEquals("21 минута", Texts.minutes(21));
     }
 
+    @Test public void playlistMetaAndFailures() {
+        assertEquals("4 трека · 14 мин", Texts.playlistMeta(4, 14 * 60 + 10));
+        assertEquals("1 трек · 1 мин", Texts.playlistMeta(1, 20));
+        assertEquals("2 трека", Texts.playlistMeta(2, 0));
+        assertEquals("0 треков", Texts.playlistMeta(0, 0));
+        assertEquals("Не удалось добавить файл", Texts.failedFiles(1));
+        assertEquals("Не удалось добавить 3 файла", Texts.failedFiles(3));
+        assertEquals("Не удалось добавить 5 файлов", Texts.failedFiles(5));
+    }
+
     @Test public void sleepState() {
         assertEquals("Выкл", Texts.sleepState(-1, false));
         assertEquals("Выкл", Texts.sleepState(0, false));

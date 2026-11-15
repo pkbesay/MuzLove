@@ -1,6 +1,5 @@
 package com.example.muzlove;
 
-import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
@@ -16,14 +15,10 @@ import android.media.audiofx.AudioEffect;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
-import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
-import android.widget.EditText;
-import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -33,7 +28,6 @@ import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatSeekBar;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.FileProvider;
@@ -63,7 +57,6 @@ final class PlayerSheets {
     private final PlayerEngine engine;
     private final AppState state;
     private final List<Sheet> openSheets = new ArrayList<>();
-    private final List<Dialog> openDialogs = new ArrayList<>();
     private final ActivityResultLauncher<Intent> effectPanel;
 
     PlayerSheets(MainActivity a) {
@@ -77,11 +70,7 @@ final class PlayerSheets {
     /** Закрыть всё открытое (MainActivity.onDestroy): слушатели движка снимаются в onDismiss. */
     void dismissAll() {
         for (Sheet s : new ArrayList<>(openSheets)) s.dismiss();
-        for (Dialog d : new ArrayList<>(openDialogs)) {
-            try { if (d.isShowing()) d.dismiss(); } catch (RuntimeException ignored) {}
-        }
         openSheets.clear();
-        openDialogs.clear();
     }
 
     private Sheet sheet(boolean dark, CharSequence title) {
@@ -340,10 +329,10 @@ final class PlayerSheets {
         if (t == null) return;
         Sheet s = sheet(dark, "Добавить в плейлист");
         s.setSubtitle("«" + t.title + "»");
-        s.addRow(R.drawable.ic_add, "Новый плейлист", null, false, () -> { s.dismiss(); newPlaylistDialog(t, dark); });
+        s.addRow(R.drawable.ic_add, "Новый плейлист", null, false, () -> { s.dismiss(); a.createPlaylist(t, dark); });
         List<Playlist> custom = state.customPlaylists();
         for (Playlist p : custom) {
-            int n = p.ids != null ? p.ids.length : 0;
+            int n = a.playlistTracks(p).size();        // только треки, которые есть в приложении
             s.addRow(R.drawable.ic_playlist, playlistName(p), Texts.tracks(n), contains(p.ids, t.id),
                     () -> { s.dismiss(); addToPlaylist(p, t); });
         }
@@ -364,49 +353,9 @@ final class PlayerSheets {
         toast("Добавлено в «" + name + "»");
     }
 
-    private void newPlaylistDialog(Track t, boolean dark) {
-        AlertDialog.Builder b = new AlertDialog.Builder(a,
-                dark ? R.style.Theme_MuzLove_Alert_Dark : R.style.Theme_MuzLove_Alert_Light);
-        Context c = b.getContext();
-        EditText in = new EditText(c);
-        in.setHint("Название плейлиста");
-        in.setSingleLine(true);
-        in.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
-        FrameLayout wrap = new FrameLayout(c);
-        int p = Math.round(20 * c.getResources().getDisplayMetrics().density);
-        wrap.setPadding(p, p / 2, p, 0);
-        wrap.addView(in);
-        AlertDialog d = b.setTitle("Новый плейлист")
-                .setView(wrap)
-                .setPositiveButton("Создать", (x, w) -> {
-                    String name = in.getText().toString().trim();
-                    if (name.isEmpty()) name = "Мой плейлист";
-                    Playlist pl = new Playlist(name, Texts.tracks(1), "#8B5CF6", "#EC4899", new int[]{t.id});
-                    state.customPlaylists().add(pl);
-                    state.savePlaylists();
-                    a.onPlaylistsChanged();
-                    toast("Добавлено в «" + name + "»");
-                })
-                .setNegativeButton("Отмена", null)
-                .create();
-        if (d.getWindow() != null)
-            d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
-        if (a.isFinishing() || a.isDestroyed()) return;
-        openDialogs.add(d);
-        d.setOnDismissListener(x -> openDialogs.remove(d));
-        d.show();
-        in.requestFocus();
-    }
+    private static String playlistName(Playlist p) { return Playlists.name(p.name); }
 
-    private static String playlistName(Playlist p) {
-        return p.name == null || p.name.trim().isEmpty() ? "Без названия" : p.name;
-    }
-
-    private static boolean contains(int[] ids, int id) {
-        if (ids == null) return false;
-        for (int x : ids) if (x == id) return true;
-        return false;
-    }
+    private static boolean contains(int[] ids, int id) { return Playlists.contains(ids, id); }
 
     // ======================= вывод звука =======================
     /** «Слушать на устройстве»: системный переключатель вывода (API 34+), иначе своя шторка. */

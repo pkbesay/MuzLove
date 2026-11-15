@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.Manifest;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -13,9 +14,12 @@ import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -29,19 +33,21 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.ConcatAdapter;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.net.Uri;
-import android.database.Cursor;
-import android.provider.OpenableColumns;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Random;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -49,11 +55,18 @@ public class MainActivity extends AppCompatActivity {
     private PlayerEngine engine;
     private AppState appState;
     private PlayerSheets sheets;                             // шторки и диалоги плеера
+    private ListSheets lists;                                // шторки и диалоги списков
     private boolean userSeeking = false;                     // пользователь тянет ползунок или волну
     private float miniRatio = 0f;                            // прогресс для полоски мини-плеера
-    private int screen = 0;                                  // 0 home, 1 search, 2 library, 3 profile, 4 settings
-    private final List<Integer> screenHistory = new ArrayList<>();
+    private int screen = 0;                                  // 0 home, 1 search, 2 library, 3 profile, 4 settings, 5 playlist
     private boolean npOpen = false;
+
+    // экран плейлиста и медиатека
+    static final int TAB_LIKED = 0, TAB_UPLOADS = 1, TAB_PLAYLISTS = 2;
+    private static int libTab = TAB_LIKED;                   // выбранная вкладка «Моё» (пока жив процесс)
+    private Playlist openPl;                                 // плейлист экрана 5
+    private int plFrom = 0;                                  // экран, с которого открыт плейлист
+    private final Random random = new Random();
 
     // тема и настройки
     private boolean light = false, waveform = false;
@@ -73,8 +86,13 @@ public class MainActivity extends AppCompatActivity {
     private ValueAnimator headerAnim;
     private View playlistsScroll;
     private EditText searchInput;
+    private View searchClear;
+    private View libTabsScroll;
+    private TextView tabLiked, tabUploads, tabPlaylists;
     private RecyclerView recycler;
     private TrackAdapter adapter;
+    private ListTopAdapter top;                              // блок над списком треков (шапка, пустое состояние)
+    private PlaylistScreen playlistScreen;
     private LinearLayout bottomNav;
     private View miniPlayer;
     private View miniCover, miniProgress;
@@ -93,8 +111,8 @@ public class MainActivity extends AppCompatActivity {
     private WaveformView wave;
 
     private final ActivityResultLauncher<String> musicPicker = registerForActivityResult(
-            new ActivityResultContracts.GetContent(),
-            uri -> { if (uri != null) handleMusicUpload(uri); }
+            new ActivityResultContracts.GetMultipleContents(),
+            uris -> { if (uris != null && !uris.isEmpty()) Uploader.start(this, uris); }
     );
 
     private final ActivityResultLauncher<String> avatarPicker = registerForActivityResult(
@@ -135,6 +153,8 @@ public class MainActivity extends AppCompatActivity {
         appState = AppState.get(this);
         engine = PlayerEngine.get(this);
         sheets = new PlayerSheets(this);   // до onStart: регистрирует ActivityResultLauncher
+        lists = new ListSheets(this);
+        Uploader.attach(this);             // загрузка, начатая прежней активностью, обновит эту
         light = storage.isLight();
         waveform = storage.isWaveform();
         computeTheme();
@@ -203,6 +223,11 @@ public class MainActivity extends AppCompatActivity {
         h1 = findViewById(R.id.h1);
         searchBox = findViewById(R.id.searchBox);
         searchInput = findViewById(R.id.searchInput);
+        searchClear = findViewById(R.id.searchClear);
+        libTabsScroll = findViewById(R.id.libTabsScroll);
+        tabLiked = findViewById(R.id.tabLiked);
+        tabUploads = findViewById(R.id.tabUploads);
+        tabPlaylists = findViewById(R.id.tabPlaylists);
         playlistsScroll = findViewById(R.id.playlistsScroll);
         playlistsRow = findViewById(R.id.playlistsRow);
         recycler = findViewById(R.id.recycler);
@@ -276,19 +301,37 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupRecycler() {
-        adapter = new TrackAdapter(appState.liked(), t -> {
-            // если играем трек из результатов поиска — запоминаем запрос в истории
-            if (screen == 1) {
-                String q = searchInput.getText().toString().trim();
-                if (!q.isEmpty()) storage.addSearchHistory(q);
+        adapter = new TrackAdapter(appState.liked(), new TrackAdapter.Callbacks() {
+            @Override public void onPlay(Track t) {
+                // если играем трек из результатов поиска — запоминаем запрос в истории
+                if (screen == 1) {
+                    String q = searchInput.getText().toString().trim();
+                    if (!q.isEmpty()) storage.addSearchHistory(q);
+                }
+                // очередь = список, который сейчас показан
+                engine.playFrom(adapter.ids(), t.id);
             }
-            // очередь = список, который сейчас показан
-            engine.playFrom(adapter.ids(), t.id);
+            @Override public void onMore(Track t) {
+                hideKeyboard();
+                lists.showTrackMenu(t, screen == 5 && isCustom(openPl) ? openPl : null);
+            }
+            @Override public void onShare(Track t) { hideKeyboard(); sheets.showShare(t, !light); }
+            @Override public void onAddToPlaylist(Track t) { hideKeyboard(); sheets.showAddToPlaylist(t, !light); }
         });
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        top = new ListTopAdapter(box);
+        playlistScreen = new PlaylistScreen(this, box);
         recycler.setLayoutManager(new LinearLayoutManager(this));
-        recycler.setAdapter(adapter);
+        recycler.setAdapter(new ConcatAdapter(top, adapter));
 
         recycler.addOnScrollListener(new androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@androidx.annotation.NonNull RecyclerView rv, int state) {
+                // результаты поиска листают — клавиатура не нужна
+                if (screen == 1 && state == RecyclerView.SCROLL_STATE_DRAGGING) hideKeyboard();
+            }
+
             @Override
             public void onScrolled(@androidx.annotation.NonNull androidx.recyclerview.widget.RecyclerView recyclerView, int dx, int dy) {
                 // Прячем/показываем мини-плеер
@@ -374,16 +417,33 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.navProfile).setOnClickListener(v -> showScreen(3));
         btnSettingsBack.setOnClickListener(v -> showScreen(3)); // Назад в профиль
 
+        tabLiked.setOnClickListener(v -> selectLibTab(TAB_LIKED));
+        tabUploads.setOnClickListener(v -> selectLibTab(TAB_UPLOADS));
+        tabPlaylists.setOnClickListener(v -> selectLibTab(TAB_PLAYLISTS));
+
         searchInput.addTextChangedListener(new TextWatcher() {
             public void beforeTextChanged(CharSequence c, int a, int b, int d) {}
-            public void onTextChanged(CharSequence c, int a, int b, int d) { applySearch(c.toString()); }
+            public void onTextChanged(CharSequence c, int a, int b, int d) {
+                searchClear.setVisibility(c.length() > 0 ? View.VISIBLE : View.GONE);
+                if (screen == 1) applySearch(c.toString());
+            }
             public void afterTextChanged(Editable e) {}
         });
 
+        // «Найти» на клавиатуре: запрос — в историю, клавиатуру спрятать
         searchInput.setOnEditorActionListener((tv, actionId, e) -> {
-            String q = searchInput.getText().toString().trim();
-            if (!q.isEmpty()) storage.addSearchHistory(q);
-            return false;
+            boolean enter = e != null && e.getKeyCode() == KeyEvent.KEYCODE_ENTER;
+            if (actionId != EditorInfo.IME_ACTION_SEARCH && !enter) return false;
+            if (e == null || e.getAction() == KeyEvent.ACTION_DOWN) {
+                String q = searchInput.getText().toString().trim();
+                if (!q.isEmpty()) storage.addSearchHistory(q);
+                hideKeyboard();
+            }
+            return true;
+        });
+        searchClear.setOnClickListener(v -> {
+            searchInput.setText("");          // TextWatcher покажет историю
+            searchInput.requestFocus();
         });
 
         miniPlayer.setOnClickListener(v -> { if (engine.isStarted()) openNowPlaying(true); });
@@ -398,6 +458,8 @@ public class MainActivity extends AppCompatActivity {
                 if (npOpen) {
                     openNowPlaying(false);
                     showScreen(0);                 // как кнопка закрытия плеера
+                } else if (screen == 5) {
+                    closePlaylist();               // туда, откуда открыли плейлист
                 } else if (screen == 4) {
                     showScreen(3);                 // из настроек — в профиль
                 } else if (screen != 0) {
@@ -469,31 +531,117 @@ public class MainActivity extends AppCompatActivity {
                 View ico = ((ViewGroup) art).getChildAt(0);
                 if (ico instanceof ImageView) ((ImageView) ico).setImageResource(R.drawable.ic_playlist);
             }
-            TextView nm = card.findViewById(R.id.plName); nm.setText(p.name); nm.setTextColor(cText);
-            TextView ds = card.findViewById(R.id.plDesc); ds.setText(p.desc); ds.setTextColor(cMuted);
+            TextView nm = card.findViewById(R.id.plName); nm.setText(Playlists.name(p.name)); nm.setTextColor(cText);
+            String desc = playlistDesc(p);
+            TextView ds = card.findViewById(R.id.plDesc); ds.setText(desc); ds.setTextColor(cMuted);
+            card.setContentDescription(Playlists.name(p.name) + ", " + desc);
+            pressFeedback(art, true);
             final Playlist fp = p;
-            card.setOnClickListener(v -> playPlaylist(fp));
+            card.setOnClickListener(v -> openPlaylist(fp));
+            if (isCustom(p)) card.setOnLongClickListener(v -> { lists.showPlaylistMenu(fp); return true; });
             playlistsRow.addView(card);
         }
+
+        // последняя карточка — «Новый плейлист»
+        View add = inf.inflate(R.layout.item_playlist, playlistsRow, false);
+        View art = add.findViewById(R.id.plArt);
+        art.setBackground(ListViews.outline(light, dp(16), dp(1.5f)));
+        if (art instanceof ViewGroup) {
+            View ico = ((ViewGroup) art).getChildAt(0);
+            if (ico instanceof ImageView) {
+                ((ImageView) ico).setImageResource(R.drawable.ic_plus);
+                ((ImageView) ico).setColorFilter(cMuted);
+            }
+        }
+        TextView nm = add.findViewById(R.id.plName); nm.setText("Новый плейлист"); nm.setTextColor(cText);
+        TextView ds = add.findViewById(R.id.plDesc); ds.setText("Соберите свой"); ds.setTextColor(cMuted);
+        add.setContentDescription("Новый плейлист");
+        pressFeedback(art, !light);
+        add.setOnClickListener(v -> createPlaylist(null, !light));
+        playlistsRow.addView(add);
     }
 
-    /** Карточка плейлиста: очередь = треки плейлиста, которые есть в приложении. */
-    private void playPlaylist(Playlist p) {
+    /** Рябь на обложке карточки при нажатии на всю карточку. */
+    private void pressFeedback(View art, boolean onDark) {
+        if (!(art instanceof FrameLayout)) return;
+        art.setDuplicateParentStateEnabled(true);
+        ((FrameLayout) art).setForeground(ListViews.rippleRounded(onDark, dp(16)));
+    }
+
+    /** Подпись плейлиста: у своих всегда посчитанное число треков (сохранённое desc может устареть). */
+    private String playlistDesc(Playlist p) {
+        if (isCustom(p) || p.desc == null) return Texts.tracks(playlistTracks(p).size());
+        return p.desc;
+    }
+
+    boolean isCustom(Playlist p) { return p != null && appState.customPlaylists().contains(p); }
+
+    /** Треки плейлиста, которые есть в приложении, по порядку и без повторов. */
+    List<Track> playlistTracks(Playlist p) {
+        List<Track> out = new ArrayList<>();
+        if (p == null || p.ids == null) return out;
+        Set<Integer> seen = new HashSet<>();
+        for (int id : p.ids) {
+            Track t = appState.find(id);
+            if (t != null && seen.add(id)) out.add(t);
+        }
+        return out;
+    }
+
+    /** «Слушать» (shuffle=false — с первого трека) или «Перемешать» (со случайного). Если этот трек
+     *  уже текущий, он не ставится на паузу: очередь становится плейлистом, а трек играет дальше. */
+    void startPlaylist(Playlist p, boolean shuffle) {
         List<Integer> ids = new ArrayList<>();
-        if (p.ids != null) for (int id : p.ids) if (appState.find(id) != null) ids.add(id);
+        for (Track t : playlistTracks(p)) ids.add(t.id);
         if (ids.isEmpty()) { toast("В плейлисте нет треков"); return; }
-        engine.playFrom(ids, ids.get(0));
+        engine.setShuffle(shuffle);
+        int start = shuffle ? ids.get(random.nextInt(ids.size())) : ids.get(0);
+        engine.playContext(ids, start);
     }
 
     // ---------- экраны ----------
     private void showScreen(int s) {
-        if (screen != s) {
-            screenHistory.add(screen);
-            if (screenHistory.size() > 10) screenHistory.remove(0);
-        }
+        if (s == 5 && openPl == null) s = 0;
+        if (s != 5) openPl = null;
+        if (screen == 1 && s != 1) hideKeyboard();
+        boolean changed = s != screen;
         screen = s;
         updateNavTints();
         applyScreenVisibility(s);
+        if (changed) recycler.scrollToPosition(0);
+    }
+
+    /** Экран плейлиста; «Назад» вернёт на экран, с которого его открыли. */
+    void openPlaylist(Playlist p) {
+        if (p == null) return;
+        if (npOpen) openNowPlaying(false);
+        if (screen != 5) plFrom = screen == 4 ? 3 : screen;
+        openPl = p;
+        hideKeyboard();
+        screen = 5;
+        updateNavTints();
+        applyScreenVisibility(5);
+        recycler.scrollToPosition(0);
+    }
+
+    void closePlaylist() {
+        openPl = null;
+        showScreen(plFrom);
+    }
+
+    /** «Моё» с нужной вкладкой (карточки профиля, конец загрузки). */
+    void showLibrary(int tab) {
+        boolean changed = libTab != tab;
+        libTab = tab;
+        showScreen(2);
+        if (changed) recycler.scrollToPosition(0);
+    }
+
+    private void selectLibTab(int tab) {
+        if (libTab == tab) return;
+        libTab = tab;
+        fillContent();
+        recycler.scrollToPosition(0);
     }
 
     private void setupProfileContent() {
@@ -539,12 +687,12 @@ public class MainActivity extends AppCompatActivity {
             playlistCount.setText(String.valueOf(appState.allPlaylists().size()));
 
         View stat1 = findViewById(R.id.statCard1);
-        if (stat1 != null) stat1.setOnClickListener(v -> showScreen(2)); // К Любимым (Медиатека)
+        if (stat1 != null) stat1.setOnClickListener(v -> showLibrary(TAB_LIKED));
 
         View stat2 = findViewById(R.id.statCard2);
-        if (stat2 != null) stat2.setOnClickListener(v -> showScreen(0)); // К плейлистам (Главная)
+        if (stat2 != null) stat2.setOnClickListener(v -> showLibrary(TAB_PLAYLISTS));
 
-        findViewById(R.id.btnCreatePlaylist).setOnClickListener(v -> createPlaylistDialog());
+        findViewById(R.id.btnCreatePlaylist).setOnClickListener(v -> createPlaylist(null, !light));
         findViewById(R.id.btnUploadMusic).setOnClickListener(v -> pickMusicFile());
         findViewById(R.id.btnSettingsInProfile).setOnClickListener(v -> showScreen(4));
         findViewById(R.id.btnSponsorship).setOnClickListener(v -> toast("Временно недоступно"));
@@ -558,8 +706,11 @@ public class MainActivity extends AppCompatActivity {
         applyProfileTheme();
     }
 
+    /** Поиск по всем трекам (встроенным и загруженным): название, исполнитель, альбом. */
     private void applySearch(String q) {
-        String qq = q.trim().toLowerCase(Locale.ROOT);
+        top.box().removeAllViews();
+        String raw = q.trim();
+        String qq = raw.toLowerCase(Locale.ROOT);
         if (qq.isEmpty()) {
             h1.setText("Поиск");
             adapter.setData(new ArrayList<>());
@@ -573,9 +724,17 @@ public class MainActivity extends AppCompatActivity {
             String hay = (t.title + " " + t.artist + " " + t.album).toLowerCase(Locale.ROOT);
             if (hay.contains(qq)) res.add(t);
         }
+        if (res.isEmpty()) {
+            top.box().addView(views().emptyState("Ничего не найдено",
+                    "По запросу «" + raw + "» нет ни треков, ни исполнителей, ни альбомов. Попробуйте изменить запрос.",
+                    null, 0, null), Sheet.matchWrap());
+        }
         adapter.setData(res);
         adapter.setCurrent(currentId());
     }
+
+    /** Строители блоков над списком в цветах текущей темы. */
+    private ListViews views() { return new ListViews(this, light, cText, cMuted); }
 
     private void showSearchHistory(boolean show) {
         if (searchHistoryBox == null) return;
@@ -658,6 +817,15 @@ public class MainActivity extends AppCompatActivity {
                 searchInput.setText(t);
                 searchInput.setSelection(t.length());   // applySearch сработает через TextWatcher
             });
+            // долгое нажатие убирает запрос из истории
+            row.setOnLongClickListener(v -> {
+                storage.removeSearchHistory(t);
+                buildSearchHistory();
+                toast("Запрос удалён из истории");
+                return true;
+            });
+            row.setContentDescription(t);
+            row.setBackground(ListViews.ripple(light, true));
             searchHistoryList.addView(row);
         }
     }
@@ -728,58 +896,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // ---------- плейлисты и загрузка ----------
-    private void createPlaylistDialog() {
-        final EditText in = new EditText(this);
-        in.setHint("Название плейлиста");
-        in.setTextColor(cText);
-        in.setHintTextColor(cMuted);
-        FrameLayout wrap = new FrameLayout(this);
-        int p = (int) dp(20);
-        wrap.setPadding(p, (int) dp(8), p, 0);
-        wrap.addView(in);
-        new AlertDialog.Builder(this)
-                .setTitle("Новый плейлист")
-                .setView(wrap)
-                .setPositiveButton("Создать", (d, w) -> {
-                    String name = in.getText().toString().trim();
-                    if (name.isEmpty()) name = "Мой плейлист";
-                    List<Integer> ids = new ArrayList<>(appState.liked());
-                    if (ids.isEmpty())
-                        for (int i = 0; i < Math.min(3, Data.TRACKS.size()); i++) ids.add(Data.TRACKS.get(i).id);
-                    int[] arr = new int[ids.size()];
-                    for (int i = 0; i < arr.length; i++) arr[i] = ids.get(i);
-                    Playlist pl = new Playlist(name, ids.size() + " " + tracksWord(ids.size()),
-                            "#8B5CF6", "#EC4899", arr);
-                    appState.customPlaylists().add(pl);
-                    appState.savePlaylists();
-                    rebuildPlaylistsRow();
-                    if (screen == 3) setupProfileContent();
-                    toast("Плейлист создан");
-                })
-                .setNegativeButton("Отмена", null)
-                .show();
+    /** Создание плейлиста (Профиль, карточка на Главной, «Моё», выбор плейлиста для трека forTrack). */
+    void createPlaylist(Track forTrack, boolean dark) { lists.createPlaylist(forTrack, dark); }
+
+    /** «Загрузить трек»: системный выбор одного или нескольких аудиофайлов. */
+    private void pickMusicFile() {
+        try { musicPicker.launch("audio/*"); }
+        catch (ActivityNotFoundException e) { toast("Нет подходящего приложения"); }
     }
 
-    private void pickMusicFile() { musicPicker.launch("audio/*"); }
-
-    private void handleMusicUpload(Uri uri) {
-        String name = queryName(uri);
-        File dest = new File(getFilesDir(), "track_" + System.currentTimeMillis() + ".audio");
-        try (InputStream in = getContentResolver().openInputStream(uri);
-             OutputStream out = new FileOutputStream(dest)) {
-            if (in == null) { toast("Не удалось открыть файл"); return; }
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-        } catch (Exception e) {
-            toast("Не удалось загрузить файл");
-            return;
-        }
-        Track t = new Track(appState.nextUploadId(), name, "Моя музыка", "Загрузки", 200,
-                "#10B981", "#06B6D4", dest.getAbsolutePath());
-        appState.addUploaded(t);
-        toast("Трек добавлен");
-        showScreen(2);
+    /** Конец загрузки (Uploader): новые треки — открыть «Моё» / «Загруженные». */
+    void onUploadsFinished(int added) {
+        if (added > 0) showLibrary(TAB_UPLOADS);
+        else refreshVisible();
     }
 
     private void handleAvatarUpload(Uri uri) {
@@ -799,28 +928,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private String queryName(Uri uri) {
-        String name = "Загруженный трек";
-        try (Cursor c = getContentResolver().query(uri, null, null, null, null)) {
-            if (c != null && c.moveToFirst()) {
-                int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                if (i != -1) { String sName = c.getString(i); if (sName != null) name = sName; }
-            }
-        } catch (Exception ignored) {}
-        return name;
-    }
-
     private void updateNavTints() {
         int on = light ? Color.BLACK : cText;
         int off = light ? 0x60000000 : 0xFF7B7796;
-        navHomeIc.setColorFilter(screen == 0 ? on : off);
-        navSearchIc.setColorFilter(screen == 1 ? on : off);
-        navLibIc.setColorFilter(screen == 2 ? on : off);
-        navProfileIc.setColorFilter(screen == 3 ? on : off);
-        navHomeTx.setTextColor(screen == 0 ? on : off);
-        navSearchTx.setTextColor(screen == 1 ? on : off);
-        navLibTx.setTextColor(screen == 2 ? on : off);
-        navProfileTx.setTextColor(screen == 3 ? on : off);
+        int tab = screen == 5 ? plFrom : screen;   // на экране плейлиста горит вкладка, откуда пришли
+        navHomeIc.setColorFilter(tab == 0 ? on : off);
+        navSearchIc.setColorFilter(tab == 1 ? on : off);
+        navLibIc.setColorFilter(tab == 2 ? on : off);
+        navProfileIc.setColorFilter(tab == 3 ? on : off);
+        navHomeTx.setTextColor(tab == 0 ? on : off);
+        navSearchTx.setTextColor(tab == 1 ? on : off);
+        navLibTx.setTextColor(tab == 2 ? on : off);
+        navProfileTx.setTextColor(tab == 3 ? on : off);
+    }
+
+    private void hideKeyboard() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+        searchInput.clearFocus();
     }
 
     // ---------- воспроизведение (команды — в PlayerEngine) ----------
@@ -837,14 +962,39 @@ public class MainActivity extends AppCompatActivity {
         return all.isEmpty() ? Data.TRACKS.get(0) : all.get(0);
     }
 
+    /** Сердечко мини-плеера и экрана плеера: текущий трек. */
     private void toggleLike() {
         Track t = engine.current();
-        if (t == null) return;
-        appState.toggleLike(t.id);
-        updateLikeIcons();
-        adapter.refreshLikes();
-        if (screen == 2) showScreen(2);
+        if (t != null) toggleLike(t.id);
+    }
+
+    /** Лайк любого трека (меню трека, плеер): всё видимое обновляется. */
+    void toggleLike(int id) {
+        appState.toggleLike(id);
+        refreshVisible();
+    }
+
+    /** Удаление загруженного трека: из очереди (до удаления файла), из данных, затем перерисовка. */
+    void deleteUploadedTrack(int id) {
+        engine.removeTrack(id);             // текущий — сменится следующим; единственный — плеер остановится
+        if (appState.removeUploaded(id)) {
+            for (Playlist p : appState.customPlaylists()) p.desc = Texts.tracks(p.ids != null ? p.ids.length : 0);
+            appState.savePlaylists();
+            toast("Трек удалён");
+        }
+        refreshVisible();
+    }
+
+    /** После любого изменения данных: ряд плейлистов, текущий список, профиль, сердечки. */
+    void refreshVisible() {
+        rebuildPlaylistsRow();
+        if (screen == 5 && !appState.allPlaylists().contains(openPl)) {
+            closePlaylist();                // плейлист удалён
+        } else if (screen <= 2 || screen == 5) {
+            fillContent();
+        }
         if (screen == 3) setupProfileContent();
+        updateLikeIcons();
     }
 
     // ---------- обновление UI ----------
@@ -983,6 +1133,7 @@ public class MainActivity extends AppCompatActivity {
         searchBox.setVisibility(View.GONE);
         eyebrow.setVisibility(View.GONE);
         searchHistoryBox.setVisibility(View.GONE);
+        libTabsScroll.setVisibility(View.GONE);
         resetHeaderState(); // шапка всегда видна и развёрнута при открытии экрана
 
         if (s == 0) {
@@ -991,19 +1142,14 @@ public class MainActivity extends AppCompatActivity {
             h1.setText("Что послушаем?");
             playlistsScroll.setVisibility(View.VISIBLE);
             recycler.setVisibility(View.VISIBLE);
-            adapter.setData(Data.TRACKS);
         } else if (s == 1) {
             h1.setText("Поиск");
             searchBox.setVisibility(View.VISIBLE);
             recycler.setVisibility(View.VISIBLE);
-            applySearch(searchInput.getText().toString());
         } else if (s == 2) {
             h1.setText("Моя медиатека");
+            libTabsScroll.setVisibility(View.VISIBLE);
             recycler.setVisibility(View.VISIBLE);
-            List<Track> lib = new ArrayList<>();
-            for (Track t : Data.TRACKS) if (appState.isLiked(t.id)) lib.add(t);
-            lib.addAll(appState.uploaded());
-            adapter.setData(lib);
         } else if (s == 3) {
             h1.setText("Профиль");
             profileContainer.setVisibility(View.VISIBLE);
@@ -1012,8 +1158,72 @@ public class MainActivity extends AppCompatActivity {
             h1.setText("Настройки");
             settingsContainer.setVisibility(View.VISIBLE);
             setupSettingsContent();
+        } else if (s == 5) {
+            headerBox.setVisibility(View.GONE);   // у плейлиста своя шапка в списке
+            recycler.setVisibility(View.VISIBLE);
         }
-        if (s == 0 || s == 1 || s == 2) adapter.setCurrent(currentId());
+        fillContent();
+    }
+
+    /** Список и блок над ним для текущего экрана (без сброса шапки и прокрутки). */
+    private void fillContent() {
+        top.box().removeAllViews();
+        if (screen == 0) adapter.setData(Data.TRACKS);
+        else if (screen == 1) applySearch(searchInput.getText().toString());
+        else if (screen == 2) fillLibrary();
+        else if (screen == 5) fillPlaylist();
+        else return;                        // профиль и настройки — без списка
+        adapter.setCurrent(currentId());
+    }
+
+    private void fillLibrary() {
+        styleLibTabs();
+        ListViews v = views();
+        LinearLayout box = top.box();
+        List<Track> list = new ArrayList<>();
+        if (libTab == TAB_LIKED) {
+            for (Track t : appState.allTracks()) if (appState.isLiked(t.id)) list.add(t);
+            if (list.isEmpty())
+                box.addView(v.emptyState(null, "Здесь появятся треки, которые вы отметите сердечком",
+                        null, 0, null), Sheet.matchWrap());
+        } else if (libTab == TAB_UPLOADS) {
+            list.addAll(appState.uploaded());
+            if (list.isEmpty())
+                box.addView(v.emptyState(null, "Загрузите свою музыку с телефона",
+                        "Загрузить трек", R.drawable.ic_upload, this::pickMusicFile), Sheet.matchWrap());
+            else box.addView(v.actionRow(R.drawable.ic_upload, "Загрузить трек", this::pickMusicFile));
+        } else {
+            box.addView(v.actionRow(R.drawable.ic_plus, "Новый плейлист", () -> createPlaylist(null, !light)));
+            for (Playlist p : appState.allPlaylists()) {
+                boolean custom = isCustom(p);
+                box.addView(v.playlistRow(p, playlistDesc(p), () -> openPlaylist(p),
+                        custom ? () -> lists.showPlaylistMenu(p) : null));
+            }
+        }
+        adapter.setData(list);
+    }
+
+    private void fillPlaylist() {
+        List<Track> tracks = playlistTracks(openPl);
+        playlistScreen.render(openPl, tracks, isCustom(openPl), light, cText, cMuted);
+        top.box().addView(playlistScreen.view());
+        adapter.setData(tracks);
+    }
+
+    /** Вкладки «Моё»: выбранная — «таблетка» цвета текста, остальные — на лёгкой подложке. */
+    private void styleLibTabs() {
+        TextView[] tabs = {tabLiked, tabUploads, tabPlaylists};
+        for (int i = 0; i < tabs.length; i++) {
+            boolean on = i == libTab;
+            GradientDrawable g = new GradientDrawable();
+            g.setCornerRadius(dp(18));
+            g.setColor(on ? cText : (light ? 0x0F000000 : 0x17FFFFFF));
+            tabs[i].setBackground(g);
+            tabs[i].setForeground(ListViews.rippleRounded(on == light, dp(18)));   // светлая рябь на тёмной таблетке
+            tabs[i].setTextColor(on ? cBase : cText);
+            tabs[i].setSelected(on);
+            tabs[i].setContentDescription(tabs[i].getText() + (on ? ", выбрано" : ""));
+        }
     }
 
     @Override
@@ -1033,20 +1243,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         if (sheets != null) sheets.dismissAll();   // окна шторок и их слушатели движка не переживают активность
+        if (lists != null) lists.dismissAll();
         super.onDestroy();
     }
 
-    // ---------- для PlayerSheets (и шторок следующих экранов) ----------
+    // ---------- для PlayerSheets, ListSheets и PlaylistScreen ----------
     PlayerEngine engine() { return engine; }
     AppState appState() { return appState; }
+    PlayerSheets playerSheets() { return sheets; }
+    ListSheets lists() { return lists; }
     /** true — светлая тема приложения (шторки вне плеера следуют ей: dark = !isLightTheme()). */
     boolean isLightTheme() { return light; }
 
-    /** Свои плейлисты изменились: ряд плейлистов на Главной и счётчики профиля. */
-    void onPlaylistsChanged() {
-        rebuildPlaylistsRow();
-        if (screen == 3) setupProfileContent();
-    }
+    /** Свои плейлисты изменились: всё видимое (ряд на Главной, «Моё», экран плейлиста, профиль). */
+    void onPlaylistsChanged() { refreshVisible(); }
 
     // ---------- тема ----------
     private void computeTheme() {
@@ -1075,6 +1285,8 @@ public class MainActivity extends AppCompatActivity {
         searchBox.setBackground(sb);
         searchInput.setTextColor(cText);
         searchInput.setHintTextColor(cMuted);
+        if (searchClear instanceof ImageView) ((ImageView) searchClear).setColorFilter(cMuted);
+        searchClear.setBackground(ListViews.ripple(light, false));
 
         bottomNav.setBackgroundColor(cBase);
         updateNavTints();

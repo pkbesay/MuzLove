@@ -147,8 +147,11 @@ public class StorageManager {
         String json = prefs.getString(KEY_SEARCH_HISTORY, null);
         if (json == null) return new ArrayList<>();
         Type type = new TypeToken<ArrayList<String>>() {}.getType();
-        List<String> list = gson.fromJson(json, type);
-        return list != null ? list : new ArrayList<>();
+        List<String> list = null;
+        try { list = gson.fromJson(json, type); } catch (RuntimeException ignored) {}
+        List<String> out = new ArrayList<>();
+        if (list != null) for (String s : list) if (s != null) out.add(s);
+        return out;
     }
 
     public void addSearchHistory(String q) {
@@ -163,6 +166,17 @@ public class StorageManager {
         list.add(0, q);
         while (list.size() > 12) list.remove(list.size() - 1);
         prefs.edit().putString(KEY_SEARCH_HISTORY, gson.toJson(list)).apply();
+    }
+
+    /** Убрать один запрос (без учёта регистра). */
+    public void removeSearchHistory(String q) {
+        if (q == null) return;
+        List<String> list = getSearchHistory();
+        boolean changed = false;
+        for (int i = list.size() - 1; i >= 0; i--) {
+            if (list.get(i).equalsIgnoreCase(q.trim())) { list.remove(i); changed = true; }
+        }
+        if (changed) prefs.edit().putString(KEY_SEARCH_HISTORY, gson.toJson(list)).apply();
     }
 
     public void clearSearchHistory() {

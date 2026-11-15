@@ -19,6 +19,18 @@ final class Texts {
 
     static String tracks(int n) { return n + " " + plural(n, "трек", "трека", "треков"); }
 
+    /** Строка под названием плейлиста: «4 трека · 14 мин»; без длительности — только число треков. */
+    static String playlistMeta(int n, long totalSec) {
+        if (n <= 0 || totalSec <= 0) return tracks(Math.max(0, n));
+        return tracks(n) + " · " + Math.max(1, Math.round(totalSec / 60.0)) + " мин";
+    }
+
+    /** «Не удалось добавить файл» / «Не удалось добавить 3 файла». */
+    static String failedFiles(int n) {
+        if (n == 1) return "Не удалось добавить файл";
+        return "Не удалось добавить " + n + " " + plural(n, "файл", "файла", "файлов");
+    }
+
     /** «через N минут»: винительный падеж (1 минуту, 2 минуты, 5 минут). */
     static String minutesAcc(int n) { return n + " " + plural(n, "минуту", "минуты", "минут"); }
 
