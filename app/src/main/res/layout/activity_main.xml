@@ -60,8 +60,9 @@
 
                 <EditText
                     android:id="@+id/searchInput"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
                     android:background="@null"
                     android:hint="Треки, исполнители, альбомы"
                     android:textColorHint="#8884A0"
@@ -71,8 +72,80 @@
                     android:inputType="text"
                     android:imeOptions="actionSearch"
                     android:maxLines="1" />
+
+                <ImageView
+                    android:id="@+id/searchClear"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="-8dp"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_close"
+                    android:contentDescription="Очистить поиск"
+                    android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- Вкладки медиатеки -->
+        <HorizontalScrollView
+            android:id="@+id/libTabsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="10dp"
+            android:clipToPadding="false"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/libTabs"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tabLiked"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:gravity="center"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="Любимые"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <TextView
+                    android:id="@+id/tabUploads"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="Загруженные"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <TextView
+                    android:id="@+id/tabPlaylists"
+                    android:layout_width="wrap_content"
+                    android:layout_height="36dp"
+                    android:layout_marginStart="8dp"
+                    android:gravity="center"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:text="Плейлисты"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+        </HorizontalScrollView>
 
         <HorizontalScrollView
             android:id="@+id/playlistsScroll"
@@ -156,7 +229,8 @@
                     android:layout_height="40dp"
                     android:padding="8dp"
                     android:src="@drawable/ic_back"
-                    android:background="?attr/selectableItemBackgroundBorderless" />
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Назад" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -172,12 +246,16 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="match_parent">
+                <!-- снизу место под мини-плеер и навигацию: последняя строка не прячется под ними -->
                 <LinearLayout
                     android:id="@+id/settingsList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="20dp" />
+                    android:paddingStart="20dp"
+                    android:paddingEnd="20dp"
+                    android:paddingTop="20dp"
+                    android:paddingBottom="140dp" />
             </ScrollView>
         </LinearLayout>
     </LinearLayout>
@@ -191,6 +269,7 @@
         android:layout_marginStart="8dp"
         android:layout_marginEnd="8dp"
         android:layout_marginBottom="74dp"
+        android:contentDescription="Открыть плеер"
         android:visibility="gone">
 
         <LinearLayout
@@ -239,12 +318,17 @@
                 android:layout_width="34dp"
                 android:layout_height="34dp"
                 android:padding="6dp"
-                android:src="@drawable/ic_heart" />
+                android:src="@drawable/ic_heart"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Добавить в любимые" />
 
             <FrameLayout
+                android:id="@+id/miniPlayBtn"
                 android:layout_width="38dp"
                 android:layout_height="38dp"
-                android:layout_marginStart="4dp">
+                android:layout_marginStart="4dp"
+                android:foreground="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Воспроизвести">
 
                 <View
                     android:layout_width="38dp"
@@ -256,6 +340,7 @@
                     android:layout_width="20dp"
                     android:layout_height="20dp"
                     android:layout_gravity="center"
+                    android:importantForAccessibility="no"
                     android:src="@drawable/ic_play" />
             </FrameLayout>
         </LinearLayout>

@@ -16,17 +16,27 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="32dp">
+        <!-- кнопки шире иконок: отрицательный отступ оставляет иконки на прежних местах -->
         <ImageView android:id="@+id/npClose"
-            android:layout_width="32dp" android:layout_height="32dp"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginStart="-4dp" android:padding="4dp"
             android:src="@drawable/ic_chevron_down" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Свернуть плеер"
             android:layout_alignParentStart="true" android:layout_centerVertical="true" />
+        <!-- длинное название альбома сокращается и не залезает на кнопки -->
         <TextView android:id="@+id/npAlbum"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
             android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"
-            android:layout_centerInParent="true" />
+            android:gravity="center" android:maxLines="1" android:ellipsize="end"
+            android:layout_marginStart="48dp" android:layout_marginEnd="48dp"
+            android:layout_centerVertical="true" />
         <ImageView android:id="@+id/btnQueue"
-            android:layout_width="28dp" android:layout_height="28dp"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:layout_marginEnd="-6dp" android:padding="6dp"
             android:src="@drawable/ic_playlist" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Очередь"
             android:layout_alignParentEnd="true" android:layout_centerVertical="true" />
     </RelativeLayout>
 
@@ -44,16 +54,27 @@
                 android:textColor="#BFFFFFFF" android:textSize="16sp" android:layout_marginTop="2dp" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>
         <ImageView android:id="@+id/btnShare" android:layout_width="40dp" android:layout_height="40dp"
-            android:padding="8dp" android:src="@drawable/ic_upload" app:tint="#FFFFFF" />
+            android:padding="8dp" android:src="@drawable/ic_upload" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Поделиться" />
         <ImageView android:id="@+id/btnMore" android:layout_width="40dp" android:layout_height="40dp"
-            android:padding="8dp" android:src="@drawable/ic_more" app:tint="#FFFFFF" />
+            android:padding="8dp" android:src="@drawable/ic_more" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Ещё" />
     </LinearLayout>
 
+    <!-- перемотка: ползунок или звуковая волна (настройка «Звуковая волна») -->
     <SeekBar android:id="@+id/slider"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:thumbTint="#FFFFFF" android:progressTint="#FFFFFF"
         android:layout_marginTop="24dp"
-        android:paddingStart="0dp" android:paddingEnd="0dp" />
+        android:paddingStart="0dp" android:paddingEnd="0dp"
+        android:contentDescription="Перемотка" />
+    <com.example.muzlove.WaveformView android:id="@+id/wave"
+        android:layout_width="match_parent" android:layout_height="48dp"
+        android:layout_marginTop="24dp"
+        android:contentDescription="Перемотка"
+        android:visibility="gone" />
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:layout_marginTop="6dp">
         <TextView android:id="@+id/timeCur" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -65,33 +86,50 @@
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="32dp">
-        <ImageView android:layout_width="0dp" android:layout_height="32dp" android:layout_weight="1"
-            android:src="@drawable/ic_eq" app:tint="#FFFFFF" android:padding="4dp" />
+        <ImageView android:id="@+id/btnEq" android:layout_width="0dp" android:layout_height="44dp" android:layout_weight="1"
+            android:src="@drawable/ic_eq" app:tint="#FFFFFF" android:padding="10dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Эквалайзер" />
         <ImageView android:id="@+id/btnPrev" android:layout_width="0dp" android:layout_height="44dp"
-            android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_prev" app:tint="#FFFFFF" />
+            android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_prev" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Предыдущий трек" />
         <FrameLayout android:id="@+id/btnPlay" android:layout_width="72dp" android:layout_height="72dp"
             android:background="@drawable/circle_accent" android:backgroundTint="#F4FE52"
+            android:foreground="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Воспроизвести"
             android:layout_marginStart="16dp" android:layout_marginEnd="16dp">
             <ImageView android:id="@+id/playIcon" android:layout_width="32dp" android:layout_height="32dp"
-                android:layout_gravity="center" android:src="@drawable/ic_play" app:tint="#000000" />
+                android:layout_gravity="center" android:src="@drawable/ic_play" app:tint="#000000"
+                android:importantForAccessibility="no" />
+            <!-- подготовка трека: крутилка вместо значка -->
+            <ProgressBar android:id="@+id/playBuffering"
+                android:layout_width="32dp" android:layout_height="32dp"
+                android:layout_gravity="center" android:indeterminate="true"
+                android:indeterminateTint="#0A0913"
+                android:importantForAccessibility="no"
+                android:visibility="gone" />
         </FrameLayout>
         <ImageView android:id="@+id/btnNext" android:layout_width="0dp" android:layout_height="44dp"
-            android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_next" app:tint="#FFFFFF" />
+            android:layout_weight="1" android:padding="6dp" android:src="@drawable/ic_next" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Следующий трек" />
         <ImageView android:id="@+id/npLike" android:layout_width="0dp" android:layout_height="44dp"
-            android:layout_weight="1" android:padding="8dp" android:src="@drawable/ic_heart" app:tint="#FFFFFF" />
+            android:layout_weight="1" android:padding="8dp" android:src="@drawable/ic_heart" app:tint="#FFFFFF"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Добавить в любимые" />
     </LinearLayout>
 
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
         android:orientation="horizontal" android:gravity="center" android:layout_marginTop="40dp">
         <ImageView android:id="@+id/btnRepeat" android:layout_width="56dp" android:layout_height="56dp"
             android:padding="16dp" android:src="@drawable/ic_repeat" app:tint="#B3FFFFFF"
-            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF" />
+            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF"
+            android:contentDescription="Повтор" />
         <View android:layout_width="24dp" android:layout_height="1dp" />
         <ImageView android:id="@+id/btnShuffle" android:layout_width="56dp" android:layout_height="56dp"
             android:padding="16dp" android:src="@drawable/ic_shuffle" app:tint="#B3FFFFFF"
-            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF" />
+            android:background="@drawable/circle_overlay" android:backgroundTint="#1AFFFFFF"
+            android:contentDescription="Перемешать" />
     </LinearLayout>
-
-    <com.example.muzlove.WaveformView android:id="@+id/wave"
-        android:layout_width="match_parent" android:layout_height="0dp" android:visibility="gone" />
 </LinearLayout>
