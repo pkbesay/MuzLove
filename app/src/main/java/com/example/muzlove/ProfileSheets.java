@@ -158,6 +158,11 @@ final class ProfileSheets {
         s.addCaption("MUZLOVE бесплатный и без рекламы. Если приложение вам нравится, расскажите о нём друзьям — "
                 + "для нас это лучшая поддержка.");
         s.addRow(R.drawable.ic_social, "Рассказать друзьям", null, false, () -> { s.dismiss(); shareApp(); });
+        if (!AppLinks.DONATE_CARD.isEmpty()) {
+            s.addCaption("Поддержать разработчика можно переводом на карту — любой суммой из приложения вашего банка.");
+            s.addRow(R.drawable.ic_heart, "Карта " + AppLinks.DONATE_CARD, "Копировать", false,
+                    () -> { s.dismiss(); copyCard(); });
+        }
         if (!AppLinks.SPONSOR_URL.isEmpty()) {
             s.addRow(R.drawable.ic_heart, "Поддержать проект", null, false, () -> { s.dismiss(); openSponsorPage(); });
         }
@@ -169,6 +174,16 @@ final class ProfileSheets {
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_TEXT, "Слушаю музыку в MUZLOVE — бесплатном плеере без рекламы. Присоединяйся!");
         startSafe(Intent.createChooser(send, "Рассказать друзьям"));
+    }
+
+    /** Копирует номер карты без пробелов — так его проще вставить в банковском приложении. */
+    private void copyCard() {
+        android.content.ClipboardManager cm =
+                (android.content.ClipboardManager) a.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm == null) return;
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("Номер карты", AppLinks.DONATE_CARD.replace(" ", "")));
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+            Toast.makeText(a, "Номер карты скопирован", Toast.LENGTH_SHORT).show();
     }
 
     private void openSponsorPage() {
