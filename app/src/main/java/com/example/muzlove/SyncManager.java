@@ -335,10 +335,9 @@ final class SyncManager {
     private static JSONObject performSync(Context context) throws IOException {
         AuthSessionStore sessions = new AuthSessionStore(context);
         // Older installations may have a valid refresh token but no locally cached account ID yet.
-        if (sessions.getAccountId() == null) {
-            refresh(context, sessions);
-            migrateAnonymousMetadata(context, sessions.getAccountId());
-        }
+        if (sessions.getAccountId() == null) refresh(context, sessions);
+        // Also migrate edits made while the user was logged out and then logged back in.
+        migrateAnonymousMetadata(context, sessions.getAccountId());
         JSONObject remote = authorized(context, sessions,
                 token -> AuthApi.getSync(context, token));
         JSONObject local = createLocalPayload(context);
