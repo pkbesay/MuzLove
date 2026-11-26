@@ -222,6 +222,32 @@ final class SyncManager {
         prefs(context).edit().clear().apply();
     }
 
+    private static void migrateAnonymousMetadata(Context context, String accountId) {
+        if (accountId == null || accountId.trim().isEmpty()) return;
+        SharedPreferences p = prefs(context);
+        String fromPrefix = "no_account_";
+        String toPrefix = "user_" + accountId.trim() + "_";
+        SharedPreferences.Editor editor = p.edit();
+        boolean changed = false;
+
+        for (Map.Entry<String, ?> entry : p.getAll().entrySet()) {
+            String source = entry.getKey();
+            if (!source.startsWith(fromPrefix)) continue;
+            String target = toPrefix + source.substring(fromPrefix.length());
+            if (!p.contains(target)) {
+                Object value = entry.getValue();
+                if (value instanceof Long) editor.putLong(target, (Long) value);
+                else if (value instanceof Integer) editor.putInt(target, (Integer) value);
+                else if (value instanceof Boolean) editor.putBoolean(target, (Boolean) value);
+                else if (value instanceof Float) editor.putFloat(target, (Float) value);
+                else if (value instanceof String) editor.putString(target, (String) value);
+            }
+            editor.remove(source);
+            changed = true;
+        }
+        if (changed) editor.apply();
+    }
+
     static void requestSync(Context context, Runnable onSuccess) {
         Context app = context.getApplicationContext();
         AuthSessionStore sessions = new AuthSessionStore(app);
@@ -309,7 +335,10 @@ final class SyncManager {
     private static JSONObject performSync(Context context) throws IOException {
         AuthSessionStore sessions = new AuthSessionStore(context);
         // Older installations may have a valid refresh token but no locally cached account ID yet.
-        if (sessions.getAccountId() == null) refresh(context, sessions);
+        if (sessions.getAccountId() == null) {
+            refresh(context, sessions);
+            migrateAnonymousMetadata(context, sessions.getAccountId());
+        }
         JSONObject remote = authorized(context, sessions,
                 token -> AuthApi.getSync(context, token));
         JSONObject local = createLocalPayload(context);
