@@ -14,7 +14,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Локальные копии встроенных онлайн-треков.
@@ -26,7 +25,6 @@ final class OfflineTrackCache {
     private static final long MAX_TOTAL_BYTES = 250L * 1024L * 1024L;
 
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
-    private static final AtomicBoolean DOWNLOADING = new AtomicBoolean(false);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
 
     private OfflineTrackCache() {}
@@ -49,8 +47,6 @@ final class OfflineTrackCache {
     static void cacheAsync(Context context, Track track, Runnable onCached) {
         if (track == null || track.url == null || !track.url.startsWith("http")) return;
         if (find(context, track.id) != null) return;
-        if (!DOWNLOADING.compareAndSet(false, true)) return;
-
         Context app = context.getApplicationContext();
         IO.execute(() -> {
             File temp = null;
@@ -100,7 +96,6 @@ final class OfflineTrackCache {
                 // Кэш необязателен: потоковое воспроизведение уже работает независимо от него.
             } finally {
                 if (!saved && temp != null && temp.exists()) temp.delete();
-                DOWNLOADING.set(false);
             }
 
             if (saved && onCached != null) MAIN.post(onCached);
