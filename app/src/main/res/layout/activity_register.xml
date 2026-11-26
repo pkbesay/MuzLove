@@ -22,36 +22,39 @@
             android:src="@drawable/muzlove_logo" />
 
         <TextView
+            android:id="@+id/tvAuthTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
             android:text="Добро пожаловать"
             android:textColor="#FFFFFF"
             android:textSize="28sp"
-            android:textStyle="bold"
-            android:layout_marginTop="24dp" />
+            android:textStyle="bold" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/tvAuthSubtitle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Как нам вас называть?"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="Создайте аккаунт, чтобы пользоваться MUZLOVE на разных устройствах"
             android:textColor="#A09CB8"
-            android:textSize="16sp"
-            android:layout_marginTop="8dp" />
+            android:textSize="15sp" />
 
         <EditText
             android:id="@+id/etRegName"
             android:layout_width="match_parent"
             android:layout_height="56dp"
+            android:layout_marginTop="28dp"
             android:background="@drawable/search_bg"
-            android:layout_marginTop="32dp"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
             android:hint="Ваше имя"
             android:importantForAutofill="no"
             android:imeOptions="actionNext"
             android:inputType="textPersonName"
             android:maxLength="30"
             android:maxLines="1"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
             android:textColor="#FFFFFF"
             android:textColorHint="#6B6880" />
 
@@ -59,16 +62,48 @@
             android:id="@+id/uzerName"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:background="@drawable/search_bg"
             android:layout_marginTop="12dp"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:hint="\@username (необязательно)"
+            android:background="@drawable/search_bg"
+            android:hint="@username (необязательно)"
             android:importantForAutofill="no"
-            android:imeOptions="actionDone"
+            android:imeOptions="actionNext"
             android:inputType="textNoSuggestions"
             android:maxLength="40"
             android:maxLines="1"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6B6880" />
+
+        <EditText
+            android:id="@+id/etAuthEmail"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/search_bg"
+            android:hint="Электронная почта"
+            android:importantForAutofill="yes"
+            android:imeOptions="actionNext"
+            android:inputType="textEmailAddress"
+            android:maxLines="1"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:textColor="#FFFFFF"
+            android:textColorHint="#6B6880" />
+
+        <EditText
+            android:id="@+id/etAuthPassword"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/search_bg"
+            android:hint="Пароль (минимум 8 символов)"
+            android:importantForAutofill="yes"
+            android:imeOptions="actionDone"
+            android:inputType="textPassword"
+            android:maxLines="1"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
             android:textColor="#FFFFFF"
             android:textColorHint="#6B6880" />
 
@@ -78,10 +113,22 @@
             android:layout_height="56dp"
             android:layout_marginTop="24dp"
             android:backgroundTint="#8B5CF6"
-            android:text="Начать"
+            android:text="Создать аккаунт"
             android:textColor="#FFFFFF"
             android:textAllCaps="false"
             android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvAuthSwitch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="Уже есть аккаунт? Войти"
+            android:textColor="#B69BFF"
+            android:textSize="15sp"
             android:textStyle="bold" />
 
     </LinearLayout>

@@ -44,7 +44,7 @@ public final class PlayerEngine {
     }
 
     private static final int TICK_MS = 250;
-    private static final String MSG_OFFLINE = "Не удалось загрузить трек. Проверьте подключение к интернету";
+    private static final String MSG_OFFLINE = "Этот трек не сохранён офлайн. Подключитесь к интернету, чтобы загрузить его";
     private static final String MSG_FILE = "Файл трека недоступен";
 
     @SuppressLint("StaticFieldLeak")       // хранит только applicationContext
@@ -190,8 +190,8 @@ public final class PlayerEngine {
         lastTickAt = SystemClock.elapsedRealtime();
         if (prepared && !fallback && mp != null) {
             try { mp.start(); } catch (IllegalStateException e) { load(true); return; }
-        } else if (!preparing && !fallback) {
-            load(true);                        // плеер потерял трек — загрузить заново
+        } else if (!preparing) {
+            load(true);                        // повторная попытка, в том числе после потери сети
             return;
         }
         registerNoisy();
@@ -377,7 +377,17 @@ public final class PlayerEngine {
         lastTickAt = SystemClock.elapsedRealtime();
 
         boolean online = isOnline(t);
+        File cachedOnline = online ? OfflineTrackCache.find(app, t.id) : null;
         if (!online && !isReadableLocal(t)) { localFailed(); return; }
+        if (online && cachedOnline == null && !NetworkStatus.hasInternet(app)) {
+            playing = false;
+            abandonFocus();
+            notifyTrack();
+            notifyState();
+            notifyProgress();
+            issue(MSG_OFFLINE);
+            return;
+        }
 
         ensurePlayer();
         try {
@@ -392,8 +402,13 @@ public final class PlayerEngine {
                 return true;
             });
             mp.setOnSeekCompleteListener(m -> { if (gen == generation) seeking = false; });
-            if (t.url.startsWith("content:") || t.url.startsWith("file:")) mp.setDataSource(app, Uri.parse(t.url));
-            else mp.setDataSource(t.url);
+            if (cachedOnline != null) {
+                mp.setDataSource(cachedOnline.getAbsolutePath());
+            } else if (t.url.startsWith("content:") || t.url.startsWith("file:")) {
+                mp.setDataSource(app, Uri.parse(t.url));
+            } else {
+                mp.setDataSource(t.url);
+            }
             mp.prepareAsync();
             preparing = true;
         } catch (Exception e) {
@@ -435,6 +450,9 @@ public final class PlayerEngine {
         fallback = false;
         failStreak = 0;
         offlineNotified = false;
+        if (current != null && isOnline(current) && OfflineTrackCache.find(app, current.id) == null) {
+            OfflineTrackCache.cacheAsync(app, current, () -> issue("Трек сохранён для прослушивания офлайн"));
+        }
         try {
             int d = mp.getDuration();
             if (d > 0) durationMs = d;
@@ -474,13 +492,18 @@ public final class PlayerEngine {
         }
     }
 
-    /** Онлайн-трек без сети: продолжаем «играть» беззвучно по Track.dur. */
+    /** Не имитируем воспроизведение без звука: потоковый трек недоступен, пока нет сети. */
     private void enterFallback() {
+        releasePlayer();
         fallback = true;
         preparing = prepared = seeking = false;
         pendingSeek = -1;
         failStreak = 0;
         lastTickAt = SystemClock.elapsedRealtime();
+        playing = false;
+        abandonFocus();
+        updateTicker();
+        notifyState();
         if (!offlineNotified) { offlineNotified = true; issue(MSG_OFFLINE); }
     }
 

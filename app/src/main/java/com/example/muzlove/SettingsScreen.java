@@ -14,8 +14,9 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 
-/** Экран «Настройки»: все строки с текущим состоянием справа. Строит их MainActivity.setupSettingsContent()
- *  при открытии экрана, после любого изменения и в onResume (состояние уведомлений меняют в системе). */
+import org.json.JSONObject;
+
+/** Экран «Настройки»: строки с текущим состоянием. */
 final class SettingsScreen {
 
     private final MainActivity a;
@@ -29,6 +30,18 @@ final class SettingsScreen {
         boolean dark = !a.isLightTheme();
 
         list.removeAllViews();
+        if (new AuthSessionStore(a).hasRefreshToken()) {
+            list.addView(a.settingRow("Выйти из аккаунта", "Подключён", this::confirmLogout));
+        } else {
+            list.addView(a.settingRow("Войти / создать аккаунт", "Не подключён", this::openAccount));
+        }
+        int cachedTracks = OfflineTrackCache.countCached(a);
+        list.addView(a.settingRow("Офлайн-музыка",
+                cachedTracks + " " + Texts.plural(cachedTracks, "трек сохранён", "трека сохранено", "треков сохранено"),
+                () -> a.dialogs().message(dark, "Офлайн-музыка",
+                        "Сохранено для прослушивания без интернета: " + cachedTracks + " треков. " +
+                        "Онлайн-треки автоматически кэшируются после успешного воспроизведения. " +
+                        "Кэш ограничен примерно 250 МБ и очищается при полном сбросе приложения.")));
         list.addView(a.settingRow("Тёмная тема", dark ? "Вкл" : "Выкл", a::toggleTheme));
         list.addView(a.settingRow("Звуковая волна", a.isWaveform() ? "Вкл" : "Выкл", a::toggleWaveform));
         list.addView(a.settingRow("Уведомление плеера", notificationsOn() ? "Вкл" : "Выкл", this::onNotificationsTap));
@@ -44,17 +57,71 @@ final class SettingsScreen {
         list.addView(a.settingRow("О приложении", ProfileSheets.versionName(a), a.profileSheets()::showAbout));
     }
 
+    private void openAccount() {
+        Intent intent = new Intent(a, RegisterActivity.class)
+                .putExtra(RegisterActivity.EXTRA_FROM_SETTINGS, true)
+                .putExtra(RegisterActivity.EXTRA_START_LOGIN, true);
+        a.startActivity(intent);
+    }
+
+    private void confirmLogout() {
+        a.dialogs().confirm(!a.isLightTheme(), "Выйти из аккаунта?",
+                "Аккаунт будет отключён на этом устройстве. Любимые треки, плейлисты, загруженная музыка и настройки останутся.",
+                "Выйти", this::logoutAccount);
+    }
+
+    private void logoutAccount() {
+        AuthSessionStore sessions = new AuthSessionStore(a);
+        new Thread(() -> {
+            boolean revoked = false;
+            try {
+                String access = sessions.getAccessToken();
+                if (access == null) {
+                    String refresh = sessions.getRefreshToken();
+                    if (refresh != null) {
+                        JSONObject updated = AuthApi.refresh(a, refresh);
+                        sessions.saveSession(updated);
+                        access = sessions.getAccessToken();
+                    }
+                }
+                if (access != null) {
+                    try {
+                        AuthApi.logout(a, access);
+                        revoked = true;
+                    } catch (AuthApi.ApiException e) {
+                        if (e.statusCode != 401) throw e;
+                        String refresh = sessions.getRefreshToken();
+                        if (refresh != null) {
+                            JSONObject updated = AuthApi.refresh(a, refresh);
+                            sessions.saveSession(updated);
+                            AuthApi.logout(a, sessions.getAccessToken());
+                            revoked = true;
+                        }
+                    }
+                }
+            } catch (Exception ignored) {
+                // При отсутствии сети всё равно очищаем токены на этом устройстве.
+            }
+            sessions.clear();
+            final boolean serverRevoked = revoked;
+            a.runOnUiThread(() -> {
+                a.toast(serverRevoked
+                        ? "Вы вышли из аккаунта. Музыка и плейлисты сохранены."
+                        : "Локальный выход выполнен. Серверная сессия завершится по сроку действия.");
+                a.refreshSettings();
+            });
+        }, "MuzLove-logout").start();
+    }
+
     // ---------- уведомление плеера ----------
     private boolean notificationsOn() {
         return NotificationManagerCompat.from(a).areNotificationsEnabled();
     }
 
-    /** Android 13+: пока разрешение можно запросить — запрашиваем; иначе (и ниже) — системные настройки уведомлений. */
     private void onNotificationsTap() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ContextCompat.checkSelfPermission(a, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             StorageManager st = a.appState().storage();
-            // после двух отказов система запрос уже не показывает; до первого запроса «обоснования» тоже нет
             boolean mayAsk = !st.wasNotificationsAsked()
                     || ActivityCompat.shouldShowRequestPermissionRationale(a, Manifest.permission.POST_NOTIFICATIONS);
             if (mayAsk) {
@@ -108,14 +175,13 @@ final class SettingsScreen {
                 "Сбросить", this::resetApp);
     }
 
-    /** Всё как при первом запуске: музыка остановлена, файлы и настройки стёрты, режимы плеера по умолчанию,
-     *  дальше — регистрация. */
     private void resetApp() {
         PlayerEngine engine = a.engine();
-        engine.stop();                          // и уведомление: сервис закроется сам, когда очередь пуста
+        engine.stop();
         Uploader.cancelPending();
-        a.appState().wipe();                    // файлы треков и аватар, настройки, данные заново
-        engine.resetToDefaults();               // перемешивание, повтор, таймер сна, эквалайзер — в памяти
+        new AuthSessionStore(a).clear();
+        a.appState().wipe();
+        engine.resetToDefaults();
         PlayerSheets.sleepChoice = 0;
         a.onAppReset();
         Intent i = new Intent(a, RegisterActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
