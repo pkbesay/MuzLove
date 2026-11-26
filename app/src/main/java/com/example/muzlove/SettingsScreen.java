@@ -35,6 +35,13 @@ final class SettingsScreen {
         } else {
             list.addView(a.settingRow("Войти / создать аккаунт", "Не подключён", this::openAccount));
         }
+        int cachedTracks = OfflineTrackCache.countCached(a);
+        list.addView(a.settingRow("Офлайн-музыка",
+                cachedTracks + " " + Texts.plural(cachedTracks, "трек сохранён", "трека сохранено", "треков сохранено"),
+                () -> a.dialogs().message(dark, "Офлайн-музыка",
+                        "Сохранено для прослушивания без интернета: " + cachedTracks + " треков. " +
+                        "Онлайн-треки автоматически кэшируются после успешного воспроизведения. " +
+                        "Кэш ограничен примерно 250 МБ и очищается при полном сбросе приложения.")));
         list.addView(a.settingRow("Тёмная тема", dark ? "Вкл" : "Выкл", a::toggleTheme));
         list.addView(a.settingRow("Звуковая волна", a.isWaveform() ? "Вкл" : "Выкл", a::toggleWaveform));
         list.addView(a.settingRow("Уведомление плеера", notificationsOn() ? "Вкл" : "Выкл", this::onNotificationsTap));
