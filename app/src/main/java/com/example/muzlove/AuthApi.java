@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 
 /** Клиент API авторизации. Локальный HTTP-сервер доступен только debug-сборке. */
 final class AuthApi {
-    private static final String DEBUG_BASE_URL = "http://192.168.0.105:18080";
+    private static final String DEBUG_BASE_URL = "https://engineering-automotive-conversation-removal.trycloudflare.com";
 
     private AuthApi() {}
 
