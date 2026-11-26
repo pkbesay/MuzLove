@@ -20,7 +20,7 @@ final class NetworkStatus {
             return caps != null
                     && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                     && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);
-        } catch (SecurityException | RuntimeException e) {
+        } catch (RuntimeException e) {
             return false;
         }
     }
