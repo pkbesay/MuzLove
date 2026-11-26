@@ -234,18 +234,56 @@ final class SyncManager {
             String source = entry.getKey();
             if (!source.startsWith(fromPrefix)) continue;
             String target = toPrefix + source.substring(fromPrefix.length());
-            if (!p.contains(target)) {
-                Object value = entry.getValue();
-                if (value instanceof Long) editor.putLong(target, (Long) value);
-                else if (value instanceof Integer) editor.putInt(target, (Integer) value);
-                else if (value instanceof Boolean) editor.putBoolean(target, (Boolean) value);
-                else if (value instanceof Float) editor.putFloat(target, (Float) value);
-                else if (value instanceof String) editor.putString(target, (String) value);
+            Object value = entry.getValue();
+            Object existing = p.getAll().get(target);
+
+            if (value instanceof Long) {
+                long incoming = (Long) value;
+                long previous = existing instanceof Long ? (Long) existing : 0L;
+                editor.putLong(target, Math.max(previous, incoming));
+            } else if (value instanceof String) {
+                String incoming = (String) value;
+                String suffix = source.substring(fromPrefix.length());
+                if ("playlist_active_ids".equals(suffix)) {
+                    Set<String> ids = readStringSet(existing instanceof String ? (String) existing : "[]");
+                    ids.addAll(readStringSet(incoming));
+                    editor.putString(target, new JSONArray(ids).toString());
+                } else if ("playlist_tombstones".equals(suffix)) {
+                    Map<String, Long> times = parseLongMap(existing instanceof String ? (String) existing : "{}");
+                    Map<String, Long> incomingTimes = parseLongMap(incoming);
+                    for (Map.Entry<String, Long> item : incomingTimes.entrySet()) {
+                        Long previous = times.get(item.getKey());
+                        if (previous == null || item.getValue() > previous) {
+                            times.put(item.getKey(), item.getValue());
+                        }
+                    }
+                    editor.putString(target, new JSONObject(times).toString());
+                } else if ("playlist_fingerprints".equals(suffix)) {
+                    Map<String, String> fingerprints = readStringMap(
+                            existing instanceof String ? (String) existing : "{}");
+                    fingerprints.putAll(readStringMap(incoming));
+                    editor.putString(target, new JSONObject(fingerprints).toString());
+                } else if (!(existing instanceof String)) {
+                    editor.putString(target, incoming);
+                }
             }
             editor.remove(source);
             changed = true;
         }
         if (changed) editor.apply();
+    }
+
+    private static Map<String, Long> parseLongMap(String json) {
+        Map<String, Long> out = new HashMap<>();
+        try {
+            JSONObject object = new JSONObject(json);
+            JSONArray names = object.names();
+            if (names != null) for (int i = 0; i < names.length(); i++) {
+                String name = names.optString(i);
+                out.put(name, object.optLong(name, 0L));
+            }
+        } catch (JSONException ignored) {}
+        return out;
     }
 
     static void requestSync(Context context, Runnable onSuccess) {
