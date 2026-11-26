@@ -190,8 +190,8 @@ public final class PlayerEngine {
         lastTickAt = SystemClock.elapsedRealtime();
         if (prepared && !fallback && mp != null) {
             try { mp.start(); } catch (IllegalStateException e) { load(true); return; }
-        } else if (!preparing && !fallback) {
-            load(true);                        // плеер потерял трек — загрузить заново
+        } else if (!preparing) {
+            load(true);                        // повторная попытка, в том числе после потери сети
             return;
         }
         registerNoisy();
@@ -494,6 +494,7 @@ public final class PlayerEngine {
 
     /** Не имитируем воспроизведение без звука: потоковый трек недоступен, пока нет сети. */
     private void enterFallback() {
+        releasePlayer();
         fallback = true;
         preparing = prepared = seeking = false;
         pendingSeek = -1;
