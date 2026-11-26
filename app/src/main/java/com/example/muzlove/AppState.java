@@ -151,8 +151,8 @@ public final class AppState {
     public List<Playlist> customPlaylists() { return custom; }
 
     public void savePlaylists() {
-        SyncManager.onLocalPlaylistsChanged(app, custom);
         storage.savePlaylists(custom);
+        SyncManager.onLocalPlaylistsChanged(app, custom);
     }
 
     /** Встроенные плейлисты, затем свои (новый список). */
