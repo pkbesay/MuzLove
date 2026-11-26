@@ -27,6 +27,28 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew --no-daemon :app:assembleDebug
+      - name: Package Android Studio source project
+        run: |
+          git archive --format=zip --output="$RUNNER_TEMP/MuzLove-android-project.zip" HEAD
+      - name: Decompile APK with JADX
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --retry-delay 2 \
+            https://github.com/skylot/jadx/releases/download/v1.5.7/jadx-1.5.7.zip \
+            -o "$RUNNER_TEMP/jadx.zip"
+          mkdir -p "$RUNNER_TEMP/jadx-tools" "$RUNNER_TEMP/MuzLove-apk-decompiled"
+          unzip -q "$RUNNER_TEMP/jadx.zip" -d "$RUNNER_TEMP/jadx-tools"
+          JADX_BIN="$(find "$RUNNER_TEMP/jadx-tools" -type f -path '*/bin/jadx' | head -n 1)"
+          test -n "$JADX_BIN"
+          chmod +x "$JADX_BIN"
+          set +e
+          "$JADX_BIN" -d "$RUNNER_TEMP/MuzLove-apk-decompiled" app/build/outputs/apk/debug/app-debug.apk
+          JADX_EXIT=$?
+          set -e
+          printf 'JADX exit code: %s\n' "$JADX_EXIT" > "$RUNNER_TEMP/MuzLove-apk-decompiled/DECOMPILATION_STATUS.txt"
+          cd "$RUNNER_TEMP"
+          zip -qr MuzLove-apk-decompiled.zip MuzLove-apk-decompiled
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
@@ -34,3 +56,17 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+      - name: Upload Android Studio source project
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuzLove-android-project-source
+          path: ${{ runner.temp }}/MuzLove-android-project.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload APK decompilation
+        uses: actions/upload-artifact@v4
+        with:
+          name: MuzLove-apk-decompiled
+          path: ${{ runner.temp }}/MuzLove-apk-decompiled.zip
+          if-no-files-found: error
+          retention-days: 30
