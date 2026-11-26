@@ -884,6 +884,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** Имя или @username изменились. */
     void onProfileChanged() {
+        SyncManager.markProfileChanged(this);
         if (screen == 3) setupProfileContent();
         if (screen == 4) setupSettingsContent();
     }
@@ -1014,6 +1015,7 @@ public class MainActivity extends AppCompatActivity {
     /** Лайк любого трека (меню трека, плеер): всё видимое обновляется. */
     void toggleLike(int id) {
         appState.toggleLike(id);
+        SyncManager.markLikeChanged(this, id);
         refreshVisible();
     }
 
@@ -1305,6 +1307,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         refreshSettings();                    // из системных настроек уведомлений мог вернуться другой ответ
+        SyncManager.requestSync(this, () -> {
+            if (!isFinishing() && !isDestroyed()) refreshVisible();
+        });
     }
 
     @Override
