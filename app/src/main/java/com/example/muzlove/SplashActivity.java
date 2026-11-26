@@ -56,6 +56,11 @@ public class SplashActivity extends AppCompatActivity {
             openNext(storage.isRegistered() ? MainActivity.class : RegisterActivity.class, null);
             return;
         }
+        if (!NetworkStatus.hasInternet(this)) {
+            openNext(storage.isRegistered() ? MainActivity.class : RegisterActivity.class,
+                    "Нет интернета. Открыт локальный режим; музыка и сохранённые данные доступны.");
+            return;
+        }
 
         io.execute(() -> {
             Class<?> target = storage.isRegistered() ? MainActivity.class : RegisterActivity.class;
