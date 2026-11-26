@@ -223,8 +223,7 @@ final class SyncManager {
     static void requestSync(Context context, Runnable onSuccess) {
         Context app = context.getApplicationContext();
         AuthSessionStore sessions = new AuthSessionStore(app);
-        if (!sessions.hasRefreshToken() || sessions.getAccountId() == null
-                || !NetworkStatus.hasInternet(app)) return;
+        if (!sessions.hasRefreshToken() || !NetworkStatus.hasInternet(app)) return;
 
         synchronized (LOCK) {
             if (onSuccess != null) callbacks.add(onSuccess);
@@ -307,6 +306,8 @@ final class SyncManager {
 
     private static JSONObject performSync(Context context) throws IOException {
         AuthSessionStore sessions = new AuthSessionStore(context);
+        // Older installations may have a valid refresh token but no locally cached account ID yet.
+        if (sessions.getAccountId() == null) refresh(context, sessions);
         JSONObject remote = authorized(context, sessions,
                 token -> AuthApi.getSync(context, token));
         JSONObject local = createLocalPayload(context);
