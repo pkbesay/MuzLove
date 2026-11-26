@@ -136,6 +136,8 @@ final class SyncManager {
             }
         }
         savePlaylistTracking(context, playlists, tombstones, currentFingerprints);
+        // Persist any new updatedAt values before the background worker reads the snapshot.
+        new StorageManager(context).savePlaylists(playlists);
         requestSync(context, null);
     }
 
