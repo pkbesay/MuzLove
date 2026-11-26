@@ -124,6 +124,7 @@ public final class AppState {
                 if (f.isFile() && (n.startsWith("track_") || n.startsWith("avatar_"))) f.delete();
             }
         }
+        OfflineTrackCache.clear(app);
         storage.clearAll();
         reload();
     }
