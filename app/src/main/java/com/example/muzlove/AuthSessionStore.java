@@ -22,6 +22,7 @@ final class AuthSessionStore {
     private static final String KEY_ALIAS = "com.example.muzlove.auth.aes";
     private static final String ACCESS = "access_token_enc";
     private static final String REFRESH = "refresh_token_enc";
+    private static final String ACCOUNT_ID = "account_id";
 
     private final SharedPreferences prefs;
 
@@ -37,13 +38,25 @@ final class AuthSessionStore {
         }
         String encryptedAccess = encrypt(access);
         String encryptedRefresh = encrypt(refresh);
-        if (!prefs.edit().putString(ACCESS, encryptedAccess).putString(REFRESH, encryptedRefresh).commit()) {
+        SharedPreferences.Editor editor = prefs.edit()
+                .putString(ACCESS, encryptedAccess)
+                .putString(REFRESH, encryptedRefresh);
+        JSONObject user = response.optJSONObject("user");
+        String accountId = user != null ? user.optString("id", null) : null;
+        if (accountId != null && !accountId.trim().isEmpty() && !"null".equals(accountId)) {
+            editor.putString(ACCOUNT_ID, accountId.trim());
+        }
+        if (!editor.commit()) {
             throw new IllegalStateException("Не удалось сохранить сессию");
         }
     }
 
     synchronized String getAccessToken() { return read(ACCESS); }
     synchronized String getRefreshToken() { return read(REFRESH); }
+    synchronized String getAccountId() {
+        String id = prefs.getString(ACCOUNT_ID, null);
+        return id == null || id.trim().isEmpty() ? null : id.trim();
+    }
 
     synchronized boolean hasRefreshToken() {
         String token = read(REFRESH);
@@ -51,7 +64,7 @@ final class AuthSessionStore {
     }
 
     synchronized void clear() {
-        prefs.edit().remove(ACCESS).remove(REFRESH).commit();
+        prefs.edit().remove(ACCESS).remove(REFRESH).remove(ACCOUNT_ID).commit();
     }
 
     private String read(String key) {
