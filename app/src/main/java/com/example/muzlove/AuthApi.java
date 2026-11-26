@@ -63,6 +63,14 @@ final class AuthApi {
         request(context, "POST", "/api/auth/logout", new JSONObject(), accessToken);
     }
 
+    static JSONObject getSync(Context context, String accessToken) throws IOException {
+        return request(context, "GET", "/api/sync", null, accessToken);
+    }
+
+    static JSONObject putSync(Context context, JSONObject payload, String accessToken) throws IOException {
+        return request(context, "PUT", "/api/sync", payload, accessToken);
+    }
+
     private static JSONObject request(Context context, String method, String path, JSONObject body, String accessToken)
             throws IOException {
         boolean debug = (context.getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
