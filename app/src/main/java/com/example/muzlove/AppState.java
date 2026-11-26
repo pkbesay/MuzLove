@@ -43,6 +43,9 @@ public final class AppState {
         uploaded.addAll(storage.getTracks());
         custom.clear();
         custom.addAll(storage.getPlaylists());
+        if (SyncManager.ensurePlaylistMetadata(app, custom)) {
+            storage.savePlaylists(custom);
+        }
         liked.clear();
         Set<Integer> saved = storage.getLikes();
         if (saved == null) { liked.add(1); liked.add(4); storage.saveLikes(liked); }   // первый запуск
@@ -125,6 +128,7 @@ public final class AppState {
             }
         }
         OfflineTrackCache.clear(app);
+        SyncManager.resetLocalTracking(app);
         storage.clearAll();
         reload();
     }
@@ -146,7 +150,10 @@ public final class AppState {
     // ---------- плейлисты ----------
     public List<Playlist> customPlaylists() { return custom; }
 
-    public void savePlaylists() { storage.savePlaylists(custom); }
+    public void savePlaylists() {
+        SyncManager.onLocalPlaylistsChanged(app, custom);
+        storage.savePlaylists(custom);
+    }
 
     /** Встроенные плейлисты, затем свои (новый список). */
     public List<Playlist> allPlaylists() {
