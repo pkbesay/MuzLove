@@ -68,6 +68,7 @@ final class SyncManager {
         SharedPreferences p = prefs(context);
         String k = key(context, "profile_updated_at");
         p.edit().putLong(k, nextTimestamp(p.getLong(k, 0L))).apply();
+        requestSync(context, null);
     }
 
     /**
@@ -135,6 +136,7 @@ final class SyncManager {
             }
         }
         savePlaylistTracking(context, playlists, tombstones, currentFingerprints);
+        requestSync(context, null);
     }
 
     private static String fingerprint(Playlist p) {
@@ -214,13 +216,8 @@ final class SyncManager {
     }
 
     static void resetLocalTracking(Context context) {
-        SharedPreferences p = prefs(context);
-        String prefix = (account(context) == null ? "no_account" : account(context)) + "_";
-        SharedPreferences.Editor editor = p.edit();
-        for (String name : p.getAll().keySet()) {
-            if (name.startsWith(prefix)) editor.remove(name);
-        }
-        editor.apply();
+        // Metadata is device-local only. Clear it on an app reset, but keep the cloud account untouched.
+        prefs(context).edit().clear().apply();
     }
 
     static void requestSync(Context context, Runnable onSuccess) {
